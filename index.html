@@ -268,12 +268,12 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
     <div class="page-inner">
       <div>
         <h1>Import statement</h1>
-        <div class="sub">Add a SESAC royalty statement CSV. Each song’s total income updates once you confirm.</div>
+        <div class="sub">Add a SESAC royalty statement CSV or a Me Gusta Music statement PDF. Each song’s total income updates once you confirm.</div>
       </div>
       <label class="drop" id="drop">
         <strong>Choose a statement file</strong>
-        <span class="hint">SESAC: Royalties → Statements → download the CSV. You can also drag the file here.</span>
-        <input type="file" id="stmtFile" accept=".csv,text/csv" class="hidden">
+        <span class="hint">SESAC statement CSV or Me Gusta statement PDF. You can also drag the file here.</span>
+        <input type="file" id="stmtFile" accept=".csv,.pdf,text/csv,application/pdf" class="hidden">
       </label>
       <div id="importResult"></div>
     </div>
@@ -749,7 +749,10 @@ function showView(v) {
 }
 
 /* =====================================================================
-   STATEMENT IMPORT (SESAC CSV)
+   STATEMENT IMPORT — SESAC CSV and Me Gusta PDF
+   Every file becomes one or more "parts" (one per account on the statement).
+   Each included part is saved as its own statement row, so the same
+   account + period can never be imported twice.
    ===================================================================== */
 const drop = $('#drop');
 $('#stmtFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) readStatement(f); e.target.value = ''; });
@@ -778,27 +781,37 @@ function monthDate(str, end) {
   return d.toISOString().slice(0, 10);
 }
 function longDate(str) { const d = new Date(String(str).trim() + ' UTC'); return isNaN(d) ? null : d.toISOString().slice(0, 10); }
+function quarterLabel(isoEnd) { if (!isoEnd) return ''; const [y, m] = isoEnd.split('-').map(Number); return `${y} Q${Math.ceil(m / 3)}`; }
 
 let stmt = null;
 async function readStatement(file) {
-  const text = await file.text();
-  const rows = parseCSV(text);
   const out = $('#importResult');
-  const first = (rows[0] || []).join(',');
-  if (!/SESAC/i.test(first) || !/Royalty Statement/i.test(first)) {
-    out.innerHTML = `<div class="banner bad">This doesn’t look like a SESAC royalty statement CSV. The first line should start with “SESAC … Royalty Statement”. BMI statement imports aren’t supported yet.</div>`;
+  out.innerHTML = '<div class="hint">Reading the statement…</div>';
+  try {
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') stmt = await readMeGustaPdf(file);
+    else stmt = readSesacCsv(await file.text(), file.name);
+  } catch (e) {
+    stmt = null;
+    out.innerHTML = `<div class="banner bad">${esc(e.message || String(e))}</div>`;
     return;
   }
-  const headerLine = (label) => { const r = rows.slice(0, 8).find(r => r.join(',').toLowerCase().startsWith(label.toLowerCase())); return r ? r.join(',').split(':').slice(1).join(':').trim() : ''; };
-  const periodRaw = (first.match(/(\d{4})\s*\/\s*(\d)/) || []);
-  const period = periodRaw.length ? `${periodRaw[1]} Q${periodRaw[2]}` : '';
-  const affiliate = headerLine('Affiliate No');
-  const distPeriod = headerLine('Distribution Period');
-  const [ps, pe] = distPeriod.split('-');
-  const distDate = headerLine('Distribution Date').replace(/"/g, '');
+  stmt.parts.forEach(matchPart);
+  await checkDuplicates();
+  renderStatement();
+}
 
+/* ---------- SESAC royalty statement CSV ---------- */
+function readSesacCsv(text, fileName) {
+  const rows = parseCSV(text);
+  const first = (rows[0] || []).join(',');
+  if (!/SESAC/i.test(first) || !/Royalty Statement/i.test(first)) {
+    throw new Error('This file isn’t a statement the app can read. Use a SESAC royalty statement CSV (first line starts “SESAC … Royalty Statement”) or a Me Gusta statement PDF.');
+  }
+  const headerLine = (label) => { const r = rows.slice(0, 8).find(r => r.join(',').toLowerCase().startsWith(label.toLowerCase())); return r ? r.join(',').split(':').slice(1).join(':').trim() : ''; };
+  const pr = first.match(/(\d{4})\s*\/\s*(\d)/) || [];
+  const distPeriod = headerLine('Distribution Period'); const [ps, pe] = distPeriod.split('-');
   const hi = rows.findIndex(r => r.includes('Song #') && r.includes('Earnings'));
-  if (hi < 0) { out.innerHTML = `<div class="banner bad">Couldn’t find the column headers (Song #, Earnings) in this file.</div>`; return; }
+  if (hi < 0) throw new Error('Couldn’t find the column headers (Song #, Earnings) in this file.');
   const H = rows[hi]; const cNo = H.indexOf('Song #'), cTitle = H.indexOf('Song Title'), cShare = H.indexOf('%Shares'), cEarn = H.indexOf('Earnings');
   const works = new Map(); let lines = 0;
   for (const r of rows.slice(hi + 1)) {
@@ -808,94 +821,219 @@ async function readStatement(file) {
     w.amount += parseFloat(r[cEarn]) || 0;
     works.set(key, w);
   }
-  const list = [...works.values()].sort((a, b) => b.amount - a.amount);
-  list.forEach(w => { w.song_id = workIndex.get('SESAC:' + w.work_no) || null; });
-  stmt = {
-    file: file.name, pro: 'SESAC', affiliate, period,
+  const list = [...works.values()];
+  return {
+    file: fileName, pro: 'SESAC', period: pr.length ? `${pr[1]} Q${pr[2]}` : '',
     period_start: ps ? monthDate(ps, false) : null, period_end: pe ? monthDate(pe, true) : null,
-    distribution_date: longDate(distDate), income_type: 'Writer', works: list, lines,
-    total: list.reduce((a, w) => a + w.amount, 0), createMissing: true, duplicate: false
+    distribution_date: longDate(headerLine('Distribution Date').replace(/"/g, '')),
+    income_type: 'Writer', createMissing: true,
+    parts: [{ affiliate: headerLine('Affiliate No'), label: headerLine('Affiliate Name'), works: list, lines, total: list.reduce((a, w) => a + w.amount, 0), include: true }]
   };
-  await checkDuplicate();
-  renderStatement();
 }
-async function checkDuplicate() {
-  const { data } = await db().from('royalty_statements').select('id,imported_at')
-    .eq('pro', stmt.pro).eq('affiliate_no', stmt.affiliate).eq('period', stmt.period).eq('income_type', stmt.income_type).limit(1);
-  stmt.duplicate = !!(data && data.length);
+
+/* ---------- Me Gusta Music statement PDF ---------- */
+let pdfjsReady = null;
+function loadPdfJs() {
+  if (!pdfjsReady) pdfjsReady = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; res(window.pdfjsLib); };
+    s.onerror = () => { pdfjsReady = null; rej(new Error('Couldn’t load the PDF reader. Check your connection and try again.')); };
+    document.head.appendChild(s);
+  });
+  return pdfjsReady;
 }
+// Rebuild the statement's text lines from the PDF's positioned text.
+async function pdfLines(pdf) {
+  const out = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const items = tc.items.filter(i => i.str && i.str.trim()).map(i => ({ s: i.str, x: i.transform[4], y: i.transform[5] }));
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const rows = [];
+    for (const it of items) {
+      const r = rows.find(r => Math.abs(r.y - it.y) < 2.5);
+      if (r) r.items.push(it); else rows.push({ y: it.y, items: [it] });
+    }
+    rows.sort((a, b) => b.y - a.y);
+    for (const r of rows) out.push({ text: r.items.sort((a, b) => a.x - b.x).map(i => i.s.trim()).join(' ').replace(/\s+/g, ' ').trim() });
+  }
+  return out;
+}
+function parseMeGusta(lines) {
+  const accts = []; let cur = null; let period = null;
+  const itemRe = /^(\d+) - ([A-Za-z]+) .*?(-?[\d.]+)% (-?[\d.,]+)$/;
+  for (const { text } of lines) {
+    let m;
+    if ((m = text.match(/Period: (\d\d)\/(\d\d)\/(\d\d) to (\d\d)\/(\d\d)\/(\d\d)/))) period = m;
+    if ((m = text.match(/^(.+?) - \((\d+)\)$/))) {
+      const no = m[2]; cur = accts.find(a => a.affiliate === no);
+      if (!cur) { cur = { affiliate: no, label: m[1].trim(), map: new Map(), pending: [], lines: 0, stated: null, include: true }; accts.push(cur); }
+      continue;
+    }
+    if (!cur) continue;
+    if ((m = text.match(itemRe))) { cur.pending.push({ type: m[2], amount: parseFloat(m[4].replace(/,/g, '')) }); cur.lines++; continue; }
+    if ((m = text.match(/Total for: (.+?) \$(-?[\d,.]+)$/))) {
+      const title = m[1].trim(); const w = cur.map.get(title) || { title, amount: 0, types: {} };
+      for (const it of cur.pending) { w.amount += it.amount; w.types[it.type] = (w.types[it.type] || 0) + it.amount; }
+      cur.map.set(title, w); cur.pending = []; continue;
+    }
+    if ((m = text.match(/TOTAL INCOME: \$(-?[\d,.]+)/))) cur.stated = parseFloat(m[1].replace(/,/g, ''));
+  }
+  const yr = (s) => 2000 + parseInt(s, 10);
+  const p = period ? { start: `${yr(period[3])}-${period[1]}-${period[2]}`, end: `${yr(period[6])}-${period[4]}-${period[5]}` } : null;
+  accts.forEach(a => {
+    a.works = [...a.map.values()].map(w => ({ ...w, work_no: norm(w.title) }));
+    a.total = a.works.reduce((s, w) => s + w.amount, 0);
+  });
+  // An account whose every line also appears, amount for amount, in another account
+  // is a repeat of that account. It's left out by default so income isn't counted twice.
+  for (const a of accts) for (const b of accts) {
+    if (a === b || a.duplicateOf || !a.works.length) continue;
+    const same = a.works.every(w => { const o = b.map.get(w.title); return o && Object.entries(w.types).every(([t, v]) => Math.abs((o.types[t] || 0) - v) < 0.00005); });
+    if (same && b.total >= a.total) { a.duplicateOf = b.affiliate; a.include = false; }
+  }
+  return { accounts: accts.filter(a => a.works.length), period: p };
+}
+async function readMeGustaPdf(file) {
+  const lib = await loadPdfJs();
+  const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const { accounts, period } = parseMeGusta(await pdfLines(pdf));
+  if (!accounts.length) throw new Error('No song income found in this PDF. The app reads Me Gusta Music royalty statements; other PDF layouts aren’t supported yet.');
+  return {
+    file: file.name, pro: 'ME GUSTA', period: quarterLabel(period?.end),
+    period_start: period?.start || null, period_end: period?.end || null, distribution_date: null,
+    income_type: 'Publisher', createMissing: true,
+    parts: accounts.map(a => ({ affiliate: a.affiliate, label: a.label, works: a.works, lines: a.lines, total: a.total, stated: a.stated, include: a.include, duplicateOf: a.duplicateOf || null }))
+  };
+}
+
+/* ---------- matching ---------- */
+function matchPart(part) {
+  const byTitle = new Map();
+  songs.forEach(s => [s.title, s.alt_title].filter(Boolean).forEach(t => { const k = norm(t); (byTitle.get(k) || byTitle.set(k, []).get(k)).push(s); }));
+  const pubHint = norm((part.label || '').split(' - ').pop());
+  for (const w of part.works) {
+    w.song_id = workIndex.get(stmt.pro + ':' + w.work_no) || null; w.ambiguous = false; w.viaTitle = false;
+    if (w.song_id || stmt.pro === 'SESAC') continue;
+    const cands = byTitle.get(norm(w.title)) || [];
+    if (!cands.length) continue;
+    // Prefer the version this account publishes, then the one with your larger share.
+    cands.sort((a, b) => (norm(JSON.stringify(b.publishers || [])).includes(pubHint) - norm(JSON.stringify(a.publishers || [])).includes(pubHint)) || ((b.your_share || 0) - (a.your_share || 0)));
+    w.song_id = cands[0].id; w.ambiguous = cands.length > 1; w.viaTitle = true;
+  }
+}
+
+async function checkDuplicates() {
+  for (const p of stmt.parts) {
+    const { data } = await db().from('royalty_statements').select('id')
+      .eq('pro', stmt.pro).eq('affiliate_no', p.affiliate).eq('period', stmt.period).eq('income_type', stmt.income_type).limit(1);
+    p.already = !!(data && data.length);
+  }
+}
+
 function renderStatement() {
-  const s = stmt; const matched = s.works.filter(w => w.song_id).length; const unmatched = s.works.length - matched;
-  const pd = s.distribution_date ? new Date(s.distribution_date + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+  const s = stmt;
+  const inc = s.parts.filter(p => p.include && !p.already);
+  const works = inc.flatMap(p => p.works);
+  const total = inc.reduce((a, p) => a + p.total, 0);
+  const matched = works.filter(w => w.song_id).length, unmatched = works.length - matched, amb = works.filter(w => w.ambiguous).length;
+  const acctLine = s.parts.length === 1 ? `${s.pro === 'SESAC' ? 'Affiliate' : 'Account'} ${esc(s.parts[0].affiliate)}` : `${s.parts.length} accounts`;
+  const multi = s.parts.length > 1;
   $('#importResult').innerHTML = `
-    ${s.duplicate ? `<div class="banner warn">This statement (${esc(s.pro)} ${esc(s.period)}, ${esc(s.income_type.toLowerCase())} income) is already in your catalog. Importing it again would count the income twice, so it’s blocked.</div>` : ''}
     <div class="facts">
-      <div class="fact"><span class="k">PRO</span><span class="v">${esc(s.pro)}</span><span class="hint mono">Affiliate ${esc(s.affiliate)}</span></div>
-      <div class="fact"><span class="k">Period</span><span class="v">${esc(s.period)}</span><span class="hint">${pd ? 'Paid ' + esc(pd) : ''}</span></div>
-      <div class="fact"><span class="k">Statement total</span><span class="v mono">${money(s.total)}</span><span class="hint">${s.works.length} songs, ${s.lines} lines</span></div>
+      <div class="fact"><span class="k">From</span><span class="v">${s.pro === 'ME GUSTA' ? 'Me Gusta Music' : esc(s.pro)}</span><span class="hint mono">${acctLine}</span></div>
+      <div class="fact"><span class="k">Period</span><span class="v">${esc(s.period || 'Unknown')}</span><span class="hint">${s.period_start && s.period_end ? esc(s.period_start + ' to ' + s.period_end) : ''}</span></div>
+      <div class="fact"><span class="k">Importing</span><span class="v mono">${money(total)}</span><span class="hint">${works.length} songs</span></div>
       <div class="fact"><span class="k">Income type</span>
         <div class="seg" role="group" aria-label="Income type">
           <button data-itype="Writer" aria-pressed="${s.income_type === 'Writer'}">Writer</button>
           <button data-itype="Publisher" aria-pressed="${s.income_type === 'Publisher'}">Publisher</button>
         </div></div>
     </div>
-    <div class="banner info">${matched} of ${s.works.length} songs matched by SESAC song number.${unmatched ? ` ${unmatched} aren’t in your catalog yet.` : ''}</div>
-    ${unmatched ? `<label class="checkline"><input type="checkbox" id="createMissing" ${s.createMissing ? 'checked' : ''}> Add the ${unmatched} unmatched songs to the catalog with their SESAC numbers</label>` : ''}
-    <div class="table">
-      <div class="tr"><span>Song</span><span class="hide-m">SESAC #</span><span class="hide-m">Match</span><span class="r">This statement</span></div>
-      ${s.works.slice(0, 25).map(w => `<div class="tr"><span style="font-weight:700">${esc(w.title)}</span><span class="hide-m mono">${esc(w.work_no)}</span><span class="hide-m">${w.song_id ? 'In catalog' : '<span class="pill warn">New</span>'}</span><span class="r">${money(w.amount)}</span></div>`).join('')}
-      ${s.works.length > 25 ? `<div class="tr"><span class="hint">And ${s.works.length - 25} more songs</span><span class="hide-m"></span><span class="hide-m"></span><span></span></div>` : ''}
-    </div>
+    ${s.parts.map((p, i) => `
+      ${p.already ? `<div class="banner warn">${esc(p.label || 'This statement')} (${esc(p.affiliate)}) for ${esc(s.period)} is already in your catalog as ${esc(s.income_type.toLowerCase())} income. It’s skipped so the income isn’t counted twice.</div>` : ''}
+      ${p.duplicateOf ? `<div class="banner warn">Account ${esc(p.affiliate)} (${esc(p.label)}) repeats lines that are also in account ${esc(p.duplicateOf)}, amount for amount. It’s left out so that income isn’t counted twice. Ask your admin what this account is before including it.</div>` : ''}
+      ${multi && !p.already ? `<label class="checkline"><input type="checkbox" data-part="${i}" ${p.include ? 'checked' : ''}> Import account ${esc(p.affiliate)}, ${esc(p.label)}: ${money(p.total)} from ${p.works.length} songs${p.stated != null && Math.abs(p.stated - p.total) > 0.02 ? ` <span class="pill warn">statement says ${money(p.stated)}</span>` : ''}</label>` : ''}
+    `).join('')}
+    ${works.length ? `<div class="banner info">${matched} of ${works.length} songs matched${s.pro === 'SESAC' ? ' by SESAC song number' : ''}.${amb ? ` ${amb} matched a title that appears more than once in your catalog; the version published by this account was used.` : ''}${unmatched ? ` ${unmatched} aren’t in your catalog yet.` : ''}</div>` : ''}
+    ${unmatched ? `<label class="checkline"><input type="checkbox" id="createMissing" ${s.createMissing ? 'checked' : ''}> Add the ${unmatched} unmatched songs to the catalog</label>` : ''}
+    ${works.length ? `<div class="table">
+      <div class="tr"><span>Song</span><span class="hide-m">${s.pro === 'SESAC' ? 'SESAC #' : 'Account'}</span><span class="hide-m">Match</span><span class="r">This statement</span></div>
+      ${works.slice().sort((a, b) => b.amount - a.amount).slice(0, 25).map(w => `<div class="tr"><span style="font-weight:700">${esc(w.title)}</span><span class="hide-m mono">${esc(s.pro === 'SESAC' ? w.work_no : inc.find(p => p.works.includes(w)).affiliate)}</span><span class="hide-m">${w.song_id ? (w.ambiguous ? '<span class="pill warn">In catalog, title repeats</span>' : 'In catalog') : '<span class="pill warn">New</span>'}</span><span class="r">${money(w.amount)}</span></div>`).join('')}
+      ${works.length > 25 ? `<div class="tr"><span class="hint">And ${works.length - 25} more songs</span><span class="hide-m"></span><span class="hide-m"></span><span></span></div>` : ''}
+    </div>` : '<div class="empty">Nothing left to import from this file.</div>'}
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn" id="stmtCancel">Cancel</button>
-      <button class="btn primary" id="stmtGo" ${s.duplicate ? 'disabled' : ''}>Import ${money(s.total)}</button>
+      <button class="btn primary" id="stmtGo" ${works.length ? '' : 'disabled'}>Import ${money(total)}</button>
     </div>`;
 }
 $('#importResult').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.itype) { stmt.income_type = b.dataset.itype; await checkDuplicate(); renderStatement(); }
+  if (b.dataset.itype) { stmt.income_type = b.dataset.itype; await checkDuplicates(); renderStatement(); }
   if (b.id === 'stmtCancel') { stmt = null; $('#importResult').innerHTML = ''; }
   if (b.id === 'stmtGo') importStatement(b);
 });
-$('#importResult').addEventListener('change', e => { if (e.target.id === 'createMissing') stmt.createMissing = e.target.checked; });
+$('#importResult').addEventListener('change', e => {
+  if (e.target.id === 'createMissing') stmt.createMissing = e.target.checked;
+  if (e.target.dataset.part != null) { stmt.parts[+e.target.dataset.part].include = e.target.checked; renderStatement(); }
+});
 
 async function importStatement(btn) {
   btn.disabled = true; btn.textContent = 'Importing…';
+  const s = stmt; let grand = 0, count = 0;
   try {
-    const s = stmt;
-    // 1) statement row (the unique rule blocks a second copy)
-    const { data: st, error: e1 } = await db().from('royalty_statements').insert({
-      user_id: user.id, pro: s.pro, affiliate_no: s.affiliate, period: s.period,
-      period_start: s.period_start, period_end: s.period_end, distribution_date: s.distribution_date,
-      income_type: s.income_type, source_file: s.file, total: Math.round(s.total * 1e6) / 1e6
-    }).select().single();
-    if (e1) throw e1;
-    // 2) new songs for unmatched works
-    const missing = s.works.filter(w => !w.song_id);
-    if (missing.length && s.createMissing) {
-      for (let i = 0; i < missing.length; i += 200) {
-        const chunk = missing.slice(i, i + 200);
-        const { data: made, error } = await db().from('songs').insert(chunk.map(w => ({ user_id: user.id, title: w.title, your_share: Math.round(w.share * 10000) / 100, status: 'Available' }))).select('id');
-        if (error) throw error;
-        chunk.forEach((w, j) => { w.song_id = made[j].id; });
-        const { error: e2 } = await db().from('song_pro_ids').insert(chunk.map(w => ({ user_id: user.id, song_id: w.song_id, pro: 'SESAC', work_no: w.work_no, title_on_statement: w.title })));
-        if (e2) throw e2;
+    for (const p of s.parts.filter(p => p.include && !p.already)) {
+      // 1) statement row (the unique rule blocks a second copy)
+      const { data: st, error: e1 } = await db().from('royalty_statements').insert({
+        user_id: user.id, pro: s.pro, affiliate_no: p.affiliate, period: s.period,
+        period_start: s.period_start, period_end: s.period_end, distribution_date: s.distribution_date,
+        income_type: s.income_type, source_file: s.file, total: Math.round(p.total * 1e6) / 1e6
+      }).select().single();
+      if (e1) throw e1;
+      // 2) new catalog songs for works that didn't match
+      const missing = p.works.filter(w => !w.song_id);
+      if (missing.length && s.createMissing) {
+        for (let i = 0; i < missing.length; i += 200) {
+          const chunk = missing.slice(i, i + 200);
+          const { data: made, error } = await db().from('songs').insert(chunk.map(w => ({
+            user_id: user.id, title: w.title, status: 'Available',
+            your_share: w.share ? Math.round(w.share * 10000) / 100 : null
+          }))).select('id');
+          if (error) throw error;
+          chunk.forEach((w, j) => { w.song_id = made[j].id; w.viaTitle = true; });
+          if (s.pro === 'SESAC') {
+            const { error: e2 } = await db().from('song_pro_ids').insert(chunk.map(w => ({ user_id: user.id, song_id: w.song_id, pro: 'SESAC', work_no: w.work_no, title_on_statement: w.title })));
+            if (e2) throw e2;
+          }
+        }
       }
-    }
-    // 3) one amount per song
-    const lines = s.works.map(w => ({ user_id: user.id, statement_id: st.id, song_id: w.song_id, work_no: w.work_no, title_on_statement: w.title, amount: Math.round(w.amount * 1e8) / 1e8 }));
-    for (let i = 0; i < lines.length; i += 500) {
-      const { error } = await db().from('royalty_song_totals').insert(lines.slice(i, i + 500));
-      if (error) throw error;
+      // 3) remember title matches so the next statement from this source lines up automatically
+      const remember = p.works.filter(w => w.song_id && w.viaTitle);
+      if (remember.length) {
+        const { error: e3 } = await db().from('song_pro_ids').upsert(
+          remember.map(w => ({ user_id: user.id, song_id: w.song_id, pro: s.pro, work_no: w.work_no, title_on_statement: w.title })),
+          { onConflict: 'user_id,pro,work_no', ignoreDuplicates: true });
+        if (e3) throw e3;
+      }
+      // 4) one amount per song
+      const lines = p.works.map(w => ({ user_id: user.id, statement_id: st.id, song_id: w.song_id || null, work_no: w.work_no, title_on_statement: w.title, amount: Math.round(w.amount * 1e8) / 1e8 }));
+      for (let i = 0; i < lines.length; i += 500) {
+        const { error } = await db().from('royalty_song_totals').insert(lines.slice(i, i + 500));
+        if (error) throw error;
+      }
+      grand += p.total; count += p.works.length;
     }
     await loadAll(); renderCatalog();
-    $('#importResult').innerHTML = `<div class="banner info">Imported ${money(s.total)} across ${s.works.length} songs. Each song’s total income is updated.</div>`;
-    toast(`Imported ${s.pro} ${s.period}`);
+    $('#importResult').innerHTML = `<div class="banner info">Imported ${money(grand)} across ${count} songs. Each song’s total income is updated.</div>`;
+    toast(`Imported ${s.pro === 'ME GUSTA' ? 'Me Gusta' : s.pro} ${s.period}`);
     stmt = null;
   } catch (e) {
+    await loadAll(); renderCatalog();
     btn.disabled = false; btn.textContent = 'Try again';
     const dup = /duplicate key/i.test(e.message || '');
-    toast(dup ? 'This statement was already imported.' : 'Import failed: ' + e.message, true);
+    toast(dup ? 'Part of this statement was already imported. Reload the file to see what’s left.' : 'Import failed: ' + e.message, true);
   }
 }
 
