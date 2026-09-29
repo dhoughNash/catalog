@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Song Like This</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --ground: #1B1A17; --bar: #1F1E1B; --panel: #211F1C; --raised: #2A2825; --chip: #2E2C28;
+  --line: #3A3833; --line-soft: #2E2C28; --line-strong: #4A4740;
+  --text: #F2EEE6; --text-2: #D9D4C9; --muted: #A8A296;
+  --amber: #E8A33D; --amber-hi: #F4BE6A; --amber-bg: #3D2F1A; --amber-text: #F2C27A;
+  --blue: #8EC1F0; --blue-bg: #24303B; --blue-line: #36495B; --blue-text: #BFD9F2;
+  --red: #E58A7A; --red-bg: #3A2220;
+  --sans: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--ground); color: var(--text); font-family: var(--sans); font-size: 14px; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+a { color: var(--amber); }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.mono { font-family: var(--mono); }
+.hidden { display: none !important; }
+
+/* ---------- auth ---------- */
+#auth { position: fixed; inset: 0; z-index: 50; background: var(--ground); display: flex; align-items: center; justify-content: center; padding: 24px; }
+#auth .box { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 12px; }
+.brand-kicker { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--muted); }
+.brand { font-size: 26px; font-weight: 800; font-stretch: 72%; letter-spacing: 0.03em; line-height: 1; }
+#auth .brand { font-size: 40px; margin-bottom: 12px; }
+.input { height: 44px; padding: 0 14px; border-radius: 8px; background: var(--raised); border: 1px solid #3F3C36; outline: none; width: 100%; }
+.input:focus { border-color: var(--amber); }
+textarea.input { height: auto; min-height: 72px; padding: 10px 14px; resize: vertical; line-height: 1.5; }
+select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23A8A296'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 30px; }
+.btn { height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--line-strong); background: transparent; color: var(--text-2); font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+.btn:hover { border-color: var(--muted); color: var(--text); }
+.btn.primary { background: var(--amber); border-color: var(--amber); color: var(--ground); font-weight: 700; }
+.btn.primary:hover { background: var(--amber-hi); border-color: var(--amber-hi); }
+.btn.outline { border-color: var(--amber); color: var(--amber); font-weight: 700; }
+.btn.danger { border-color: #6A3A33; color: var(--red); }
+.btn.small { height: 36px; padding: 0 12px; font-size: 13px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.err { color: var(--red); font-size: 13px; min-height: 18px; }
+.linkbtn { background: none; border: 0; color: var(--amber); cursor: pointer; padding: 6px 0; text-decoration: underline; }
+
+/* ---------- shell ---------- */
+.app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+header.top { flex-shrink: 0; display: flex; align-items: center; gap: 28px; padding: 0 28px; height: 72px; border-bottom: 1px solid var(--line); background: var(--bar); padding-top: env(safe-area-inset-top, 0px); }
+nav.tabs { display: flex; gap: 4px; }
+nav.tabs button { height: 44px; padding: 0 16px; border-radius: 8px; border: 0; background: transparent; color: #B9B3A7; font-weight: 600; cursor: pointer; }
+nav.tabs button[aria-current="page"] { background: var(--chip); color: var(--text); font-weight: 700; }
+nav.tabs .count { font-family: var(--mono); font-size: 12px; color: var(--amber); margin-left: 6px; }
+.spacer { flex-grow: 1; }
+.view { flex-grow: 1; min-height: 0; }
+
+/* ---------- catalog ---------- */
+#view-catalog { display: grid; grid-template-columns: minmax(0, 1fr) 540px; }
+.list-col { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.list-head { padding: 20px 28px 14px; display: flex; flex-direction: column; gap: 14px; border-bottom: 1px solid var(--line-soft); }
+.list-head-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spacing: 0.01em; line-height: 1; }
+.sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.lifetime { text-align: right; }
+.lifetime .label { font-size: 12px; color: var(--muted); }
+.lifetime .num { font-family: var(--mono); font-size: 28px; font-weight: 600; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.controls .input { width: auto; }
+#search { flex: 1 1 220px; min-width: 180px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
+.seg button { height: 42px; padding: 0 14px; border: 0; background: transparent; color: var(--text-2); cursor: pointer; font-weight: 600; font-size: 13px; }
+.seg button + button { border-left: 1px solid var(--line-strong); }
+.seg button[aria-pressed="true"] { background: var(--amber); color: var(--ground); }
+.cols { display: grid; grid-template-columns: minmax(0, 2.6fr) 0.9fr 0.8fr 0.9fr 1fr; gap: 14px; padding: 10px 28px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line-soft); }
+.cols .r, .row .r { text-align: right; }
+#rows { flex-grow: 1; min-height: 0; overflow-y: auto; }
+.row { display: grid; grid-template-columns: minmax(0, 2.6fr) 0.9fr 0.8fr 0.9fr 1fr; gap: 14px; align-items: center; width: 100%; min-height: 60px; padding: 10px 28px; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; text-align: left; cursor: pointer; color: var(--text); }
+.row:hover { background: #24221F; }
+.row.sel { background: var(--raised); }
+.row .t { font-size: 15px; font-weight: 700; font-stretch: 88%; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.sel .t { color: var(--amber); }
+.row .m { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .c { font-size: 13px; color: var(--text-2); }
+.row .money { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.row .money.zero { color: #6F6A60; font-weight: 400; }
+.empty { padding: 48px 28px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+
+/* ---------- detail ---------- */
+#detail { min-height: 0; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 24px 28px 40px; }
+.detail-empty { color: var(--muted); padding-top: 40px; line-height: 1.6; }
+.d-top { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.d-back { display: none; }
+.d-title { font-size: 30px; font-weight: 800; font-stretch: 74%; letter-spacing: 0.01em; line-height: 1.05; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 4px 6px; margin: 0 -7px; width: calc(100% + 14px); color: var(--text); }
+.d-title:hover { border-color: var(--line); }
+.d-title:focus { border-color: var(--amber); outline: none; }
+.d-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.card { border: 1px solid var(--line); border-radius: 10px; background: var(--ground); padding: 16px 18px; margin-bottom: 18px; }
+.card h3 { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: var(--text-2); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.card h3 .aside { font-weight: 500; font-size: 12px; color: var(--muted); }
+.big-money { font-family: var(--mono); font-size: 32px; font-weight: 600; }
+.lines .ln { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line-soft); font-size: 13px; align-items: center; }
+.lines .ln .amt { font-family: var(--mono); font-weight: 600; text-align: right; }
+.hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-size: 12px; color: var(--muted); }
+.taggrp { margin-bottom: 14px; }
+.taggrp > .lbl { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--line-strong); background: transparent; color: var(--text-2); font-weight: 600; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--ground); }
+.toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; border: 0; border-top: 1px solid var(--line-soft); background: transparent; cursor: pointer; font-weight: 600; font-size: 14px; padding: 0; color: var(--text); }
+.pill { height: 26px; display: inline-flex; align-items: center; padding: 0 11px; border-radius: 13px; font-size: 12px; font-weight: 700; background: var(--chip); color: #B9B3A7; }
+.pill.on { background: var(--amber); color: var(--ground); }
+.pill.blue { background: var(--blue-bg); color: var(--blue-text); }
+.pill.warn { background: var(--amber-bg); color: var(--amber-text); }
+.party { display: grid; grid-template-columns: minmax(0, 1fr) 96px 78px 36px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.party .input { height: 38px; padding: 0 10px; font-size: 13px; }
+.x { width: 36px; height: 36px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font-size: 16px; }
+.x:hover { border-color: #6A3A33; color: var(--red); }
+.addrow { width: 100%; height: 38px; border: 1px dashed var(--line-strong); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; margin-bottom: 4px; }
+.addrow:hover { border-color: var(--amber); color: var(--text); }
+.totals { font-family: var(--mono); font-size: 12px; margin-top: 10px; }
+.totals.ok { color: var(--blue); } .totals.bad { color: var(--amber); }
+.subhead { font-size: 12px; color: var(--muted); margin: 14px 0 8px; }
+.works .w { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); font-size: 13px; align-items: center; }
+.fit { display: grid; grid-template-columns: minmax(0, 1fr) 110px 34px; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.fit .why { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+.bar { height: 8px; border-radius: 4px; background: #33312C; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--amber); border-radius: 4px; }
+.savebar { position: sticky; bottom: -40px; margin: 8px -28px -40px; padding: 14px 28px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--panel); border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+.savebar .status { font-size: 13px; color: var(--muted); margin-right: auto; }
+
+/* ---------- import / vault pages ---------- */
+.page { overflow-y: auto; }
+.page-inner { max-width: 1100px; margin: 0 auto; padding: 28px 28px 60px; display: flex; flex-direction: column; gap: 20px; }
+.drop { border: 1.5px dashed var(--line-strong); border-radius: 12px; padding: 32px; text-align: center; background: var(--panel); cursor: pointer; }
+.drop:hover, .drop.over { border-color: var(--amber); }
+.drop strong { display: block; font-size: 17px; margin-bottom: 6px; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.fact .k { font-size: 12px; color: var(--muted); }
+.fact .v { font-size: 20px; font-weight: 800; }
+.fact .v.mono { font-weight: 600; }
+.banner { border-radius: 10px; padding: 14px 18px; line-height: 1.5; }
+.banner.warn { background: var(--amber-bg); border: 1px solid #7A5A26; color: #F8D9A6; }
+.banner.info { background: var(--blue-bg); border: 1px solid var(--blue-line); color: var(--blue-text); }
+.banner.bad { background: var(--red-bg); border: 1px solid #6A3A33; color: #F2C3B8; }
+.table { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.tr { display: grid; grid-template-columns: minmax(0, 2fr) 1fr 0.8fr 1fr; gap: 14px; padding: 11px 18px; border-top: 1px solid var(--line-soft); align-items: center; font-size: 14px; }
+.tr:first-child { border-top: 0; background: var(--panel); font-size: 12px; color: var(--muted); }
+.tr .r { text-align: right; font-family: var(--mono); }
+.vault-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line-soft); }
+.vault-item:first-child { border-top: 0; }
+.vault-item .t { font-weight: 700; font-size: 15px; }
+.vault-item .m { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.checkline { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.checkline input { width: 20px; height: 20px; accent-color: var(--amber); }
+
+/* ---------- toast ---------- */
+#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(16px); background: var(--raised); border: 1px solid var(--line-strong); color: var(--text); padding: 12px 18px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60; max-width: 90vw; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.error { border-color: #6A3A33; color: #F2C3B8; }
+@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+
+/* ---------- mobile ---------- */
+@media (max-width: 900px) {
+  header.top { gap: 12px; padding: 0 14px; height: auto; min-height: 60px; flex-wrap: wrap; padding-bottom: 8px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+  .brand-kicker { display: none; }
+  .brand { font-size: 20px; }
+  nav.tabs { order: 3; width: 100%; overflow-x: auto; }
+  #view-catalog { grid-template-columns: 1fr; }
+  #detail { position: fixed; inset: 0; z-index: 30; border-left: 0; padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 40px; transform: translateX(100%); transition: transform .22s ease; }
+  #detail.open { transform: translateX(0); }
+  .d-back { display: inline-flex; align-self: flex-start; }
+  .savebar { margin: 8px -18px -40px; padding-left: 18px; padding-right: 18px; }
+  .list-head { padding: 16px 14px 12px; }
+  .cols { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 14px; }
+  .row .c { display: none; }
+  .facts { grid-template-columns: 1fr 1fr; }
+  .tr { grid-template-columns: minmax(0, 1fr) auto; }
+  .tr .hide-m { display: none; }
+  .page-inner { padding: 18px 14px 60px; }
+  .vault-item { grid-template-columns: 1fr; }
+  .actions { justify-content: flex-start; }
+  .party { grid-template-columns: minmax(0, 1fr) 80px 64px 36px; }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) { #detail { transition: none; } }
+</style>
+</head>
+<body>
+
+<!-- ======================= AUTH ======================= -->
+<div id="auth">
+  <div class="box">
+    <div class="brand-kicker">MASTER BUS</div>
+    <div class="brand">SONG LIKE THIS</div>
+    <label class="field"><span>Email</span><input class="input" type="email" id="authEmail" autocomplete="username"></label>
+    <label class="field"><span>Password</span><input class="input" type="password" id="authPassword" autocomplete="current-password"></label>
+    <button class="btn primary" id="authBtn">Sign in</button>
+    <div class="err" id="authErr"></div>
+    <div class="hint">Use the same account as Song Vault and Pitch Log.</div>
+  </div>
+</div>
+
+<!-- ======================= APP ======================= -->
+<div class="app hidden" id="app">
+  <header class="top">
+    <div>
+      <div class="brand-kicker">MASTER BUS</div>
+      <div class="brand">SONG LIKE THIS</div>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <button data-view="catalog" aria-current="page">Catalog</button>
+      <button data-view="import">Import statement</button>
+      <button data-view="vault">Song Vault<span class="count" id="vaultCount"></span></button>
+    </nav>
+    <div class="spacer"></div>
+    <button class="btn primary" id="newSongBtn">New song</button>
+    <button class="btn" id="signOutBtn">Sign out</button>
+  </header>
+
+  <!-- CATALOG -->
+  <section class="view" id="view-catalog">
+    <div class="list-col">
+      <div class="list-head">
+        <div class="list-head-top">
+          <div>
+            <h1>Catalog</h1>
+            <div class="sub" id="catSummary">Loading your catalog…</div>
+          </div>
+          <div class="lifetime">
+            <div class="label">Lifetime income</div>
+            <div class="num" id="lifetime">$0.00</div>
+          </div>
+        </div>
+        <div class="controls">
+          <input class="input" id="search" type="search" placeholder="Search title, writer, or work number" aria-label="Search songs">
+          <div class="seg" role="group" aria-label="Tagging">
+            <button data-tagf="all" aria-pressed="true">All</button>
+            <button data-tagf="tagged" aria-pressed="false">Tagged</button>
+            <button data-tagf="untagged" aria-pressed="false">Untagged</button>
+          </div>
+          <select class="input" id="statusFilter" aria-label="Status"><option value="">Any status</option></select>
+          <select class="input" id="sortBy" aria-label="Sort">
+            <option value="income">Most income</option>
+            <option value="title">Title A–Z</option>
+            <option value="newest">Newest registered</option>
+          </select>
+        </div>
+      </div>
+      <div class="cols"><span>Title</span><span>Status</span><span>Vocal</span><span>Tempo</span><span class="r">Total income</span></div>
+      <div id="rows"></div>
+    </div>
+    <aside id="detail" aria-label="Song details">
+      <div class="detail-empty">Choose a song to see its income, rights and tags.</div>
+    </aside>
+  </section>
+
+  <!-- IMPORT -->
+  <section class="view page hidden" id="view-import">
+    <div class="page-inner">
+      <div>
+        <h1>Import statement</h1>
+        <div class="sub">Add a SESAC royalty statement CSV. Each song’s total income updates once you confirm.</div>
+      </div>
+      <label class="drop" id="drop">
+        <strong>Choose a statement file</strong>
+        <span class="hint">SESAC: Royalties → Statements → download the CSV. You can also drag the file here.</span>
+        <input type="file" id="stmtFile" accept=".csv,text/csv" class="hidden">
+      </label>
+      <div id="importResult"></div>
+    </div>
+  </section>
+
+  <!-- SONG VAULT -->
+  <section class="view page hidden" id="view-vault">
+    <div class="page-inner">
+      <div>
+        <h1>New from Song Vault</h1>
+        <div class="sub">Co-writes in Song Vault that aren’t in your catalog yet. Adding one copies its writers, publishers and splits.</div>
+      </div>
+      <div id="vaultList"><div class="empty">Checking Song Vault…</div></div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   CONFIG — same Supabase project as Song Vault / Pitch Log
+   ===================================================================== */
+const SUPA_URL = 'https://ydxriywpkkdptwcuqaaj.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkeHJpeXdwa2tkcHR3Y3VxYWFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Njc5NjYsImV4cCI6MjA5NDE0Mzk2Nn0.SYACMatBKKEZV0Wo3rJ6iPSzt0E14qXjT2DieUsG9Zk';
+const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+const db = () => sb.schema('song_like_this');
+const vaultDb = () => sb.schema('song_vault');
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+let user = null;
+let songs = [];                 // song_like_this.songs rows
+let incomeBySong = new Map();   // song_id -> {total, last}
+let workNos = new Map();        // song_id -> [{pro, work_no, society_status}]
+let workIndex = new Map();      // 'SESAC:123' -> song_id
+let tagOpts = {};               // category -> [values]
+let selectedId = null;
+let draft = null;               // song being edited in the panel
+let dirty = false;
+let tagFilter = 'all';
+let vaultPending = [];
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = (t) => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function money(n) { n = Number(n) || 0; if (n > 0 && n < 0.01) return '<$0.01'; return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function toast(msg, isErr) { const t = $('#toast'); t.textContent = msg; t.className = isErr ? 'error show' : 'show'; clearTimeout(t._h); t._h = setTimeout(() => t.className = isErr ? 'error' : '', 3600); }
+function isTagged(s) { return !!(s.vocal_gender || s.tempo_feel || s.demo_level || (s.topics || []).length || (s.sub_genres || []).length); }
+
+/* Load every row of a query, 1000 at a time (Supabase caps a single request). */
+async function fetchAll(build) {
+  const out = []; let from = 0; const size = 1000;
+  for (;;) {
+    const { data, error } = await build().range(from, from + size - 1);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < size) break;
+    from += size;
+  }
+  return out;
+}
+
+/* =====================================================================
+   AUTH
+   ===================================================================== */
+$('#authBtn').addEventListener('click', signIn);
+$('#authPassword').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+async function signIn() {
+  const email = $('#authEmail').value.trim(), password = $('#authPassword').value;
+  $('#authErr').textContent = '';
+  if (!email || !password) { $('#authErr').textContent = 'Enter your email and password.'; return; }
+  $('#authBtn').disabled = true; $('#authBtn').textContent = 'Signing in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  $('#authBtn').disabled = false; $('#authBtn').textContent = 'Sign in';
+  if (error) { $('#authErr').textContent = error.message; return; }
+  start(data.session);
+}
+$('#signOutBtn').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+
+let started = false;
+async function start(session) {
+  if (started || !session) return; started = true;
+  user = session.user;
+  $('#auth').classList.add('hidden'); $('#app').classList.remove('hidden');
+  try { await loadAll(); } catch (e) { showLoadError(e); return; }
+  renderCatalog();
+  checkVault();
+}
+sb.auth.onAuthStateChange((ev, session) => { if (ev === 'SIGNED_IN' && session) start(session); });
+(async () => { const { data: { session } } = await sb.auth.getSession(); if (session) start(session); })();
+
+function showLoadError(e) {
+  const msg = e?.message || String(e);
+  const schemaHint = /schema/i.test(msg) ? ' In Supabase, add song_like_this under Project Settings → Data API → Exposed schemas, then reload.' : '';
+  $('#catSummary').textContent = 'Couldn’t load the catalog: ' + msg + schemaHint;
+}
+
+/* =====================================================================
+   DATA
+   ===================================================================== */
+async function loadAll() {
+  const [s, inc, ids, opts] = await Promise.all([
+    fetchAll(() => db().from('songs').select('*').order('title')),
+    fetchAll(() => db().from('song_income').select('song_id,total_income,last_paid_period')),
+    fetchAll(() => db().from('song_pro_ids').select('song_id,pro,work_no,society_status')),
+    fetchAll(() => db().from('tag_options').select('category,value,sort_order').order('sort_order'))
+  ]);
+  songs = s;
+  incomeBySong = new Map(inc.map(r => [r.song_id, { total: Number(r.total_income) || 0, last: r.last_paid_period }]));
+  workNos = new Map(); workIndex = new Map();
+  ids.forEach(r => {
+    if (!workNos.has(r.song_id)) workNos.set(r.song_id, []);
+    workNos.get(r.song_id).push(r);
+    workIndex.set(r.pro + ':' + r.work_no, r.song_id);
+  });
+  tagOpts = {};
+  opts.forEach(o => { (tagOpts[o.category] ||= []); if (!tagOpts[o.category].includes(o.value)) tagOpts[o.category].push(o.value); });
+  const sf = $('#statusFilter'); const cur = sf.value;
+  sf.innerHTML = '<option value="">Any status</option>' + (tagOpts.status || ['Available', 'On hold', 'Cut', 'Released']).map(v => `<option>${esc(v)}</option>`).join('');
+  sf.value = cur;
+}
+
+/* =====================================================================
+   CATALOG LIST
+   ===================================================================== */
+$('#search').addEventListener('input', renderRows);
+$('#statusFilter').addEventListener('change', renderRows);
+$('#sortBy').addEventListener('change', renderRows);
+$$('[data-tagf]').forEach(b => b.addEventListener('click', () => {
+  tagFilter = b.dataset.tagf;
+  $$('[data-tagf]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  renderRows();
+}));
+
+function renderCatalog() {
+  const total = [...incomeBySong.values()].reduce((a, r) => a + r.total, 0);
+  $('#lifetime').textContent = money(total);
+  renderRows();
+}
+
+function filteredSongs() {
+  const q = $('#search').value.trim().toLowerCase();
+  const st = $('#statusFilter').value;
+  let list = songs.filter(s => {
+    if (tagFilter === 'tagged' && !isTagged(s)) return false;
+    if (tagFilter === 'untagged' && isTagged(s)) return false;
+    if (st && s.status !== st) return false;
+    if (q) {
+      const hay = [s.title, s.alt_title, s.iswc, ...(s.writers || []).map(w => w.name), ...(workNos.get(s.id) || []).map(w => w.work_no)].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const sort = $('#sortBy').value;
+  const inc = id => incomeBySong.get(id)?.total || 0;
+  if (sort === 'income') list.sort((a, b) => inc(b.id) - inc(a.id) || a.title.localeCompare(b.title));
+  else if (sort === 'newest') list.sort((a, b) => String(b.registered_on || b.created_at).localeCompare(String(a.registered_on || a.created_at)));
+  else list.sort((a, b) => a.title.localeCompare(b.title));
+  return list;
+}
+
+function renderRows() {
+  const list = filteredSongs();
+  const tagged = songs.filter(isTagged).length;
+  $('#catSummary').textContent = `${songs.length} songs, ${tagged} tagged. Showing ${list.length}.`;
+  if (!list.length) {
+    $('#rows').innerHTML = `<div class="empty">${songs.length ? 'No songs match. Clear the search or a filter.' : 'Your catalog is empty. Add a song, import a statement, or bring songs in from Song Vault.'}</div>`;
+    return;
+  }
+  // Render in one pass; 600+ rows is fine for the browser.
+  $('#rows').innerHTML = list.map(s => {
+    const inc = incomeBySong.get(s.id)?.total || 0;
+    const nums = (workNos.get(s.id) || []).map(w => w.pro + ' ' + w.work_no).join(', ');
+    const share = s.your_share != null ? `your share ${Number(s.your_share)}%` : '';
+    return `<button class="row${s.id === selectedId ? ' sel' : ''}" data-id="${s.id}">
+      <span style="min-width:0"><div class="t">${esc(s.title)}</div><div class="m">${esc([nums, share].filter(Boolean).join(' · ') || 'No work number yet')}</div></span>
+      <span class="c">${esc(s.status || '')}</span>
+      <span class="c">${esc(s.vocal_gender || '—')}</span>
+      <span class="c">${esc(s.tempo_feel || '—')}</span>
+      <span class="r money${inc ? '' : ' zero'}">${inc ? money(inc) : '$0.00'}</span>
+    </button>`;
+  }).join('');
+}
+$('#rows').addEventListener('click', e => {
+  const b = e.target.closest('.row'); if (!b) return;
+  openSong(b.dataset.id);
+});
+
+/* =====================================================================
+   DETAIL PANEL
+   ===================================================================== */
+const SINGLE_TAGS = [['vocal_gender', 'vocal_gender', 'Vocal'], ['tempo_feel', 'tempo_feel', 'Tempo feel'], ['demo_level', 'demo_level', 'Demo level'], ['pov', 'pov', 'Point of view']];
+const MULTI_TAGS = [['sub_genres', 'sub_genre', 'Sub-genre'], ['topics', 'topic', 'Topics'], ['moods', 'mood', 'Mood']];
+
+async function openSong(id) {
+  if (dirty && !confirm('You have unsaved changes. Discard them?')) return;
+  selectedId = id;
+  const s = songs.find(x => x.id === id); if (!s) return;
+  draft = JSON.parse(JSON.stringify(s)); dirty = false;
+  $$('.row').forEach(r => r.classList.toggle('sel', r.dataset.id === id));
+  renderDetail();
+  $('#detail').classList.add('open');
+  loadSongExtras(id);
+}
+
+function newSong() {
+  if (dirty && !confirm('You have unsaved changes. Discard them?')) return;
+  showView('catalog');
+  selectedId = null;
+  draft = { id: null, title: '', status: 'Available', writers: [], publishers: [], sub_genres: [], topics: [], moods: [], sounds_like: [], sync_ready: false, master_owned: false };
+  dirty = true;
+  $$('.row').forEach(r => r.classList.remove('sel'));
+  renderDetail();
+  $('#detail').classList.add('open');
+  setTimeout(() => $('#d-title')?.focus(), 50);
+}
+$('#newSongBtn').addEventListener('click', newSong);
+
+function renderDetail() {
+  const d = draft; const isNew = !d.id;
+  const inc = incomeBySong.get(d.id);
+  const works = workNos.get(d.id) || [];
+  const statusOpts = (tagOpts.status || ['Available', 'On hold', 'Cut', 'Released']);
+  const metaBits = [d.registered_on ? 'Registered ' + d.registered_on : '', d.iswc ? 'ISWC ' + d.iswc : '', d.your_share != null ? 'Your share ' + Number(d.your_share) + '%' : ''].filter(Boolean);
+
+  $('#detail').innerHTML = `
+    <div class="d-top">
+      <button class="btn small d-back" id="d-back">Back to catalog</button>
+      <input class="d-title" id="d-title" value="${esc(d.title)}" placeholder="Song title" aria-label="Song title">
+      <div class="d-meta">${esc(metaBits.join(' · ') || (isNew ? 'New song' : ''))}</div>
+    </div>
+
+    ${isNew ? '' : `
+    <div class="card">
+      <h3>Total income <span class="aside">${inc?.last ? 'Last paid ' + esc(inc.last) : 'No statements yet'}</span></h3>
+      <div class="big-money">${money(inc?.total || 0)}</div>
+      <div class="lines" id="d-income"><div class="hint" style="margin-top:8px">Loading statements…</div></div>
+    </div>`}
+
+    <div class="card">
+      <h3>Song details</h3>
+      <div class="grid2">
+        <label class="field"><span>Status</span><select class="input" data-f="status">${statusOpts.map(v => `<option ${d.status === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+        <label class="field"><span>Your share (% of song)</span><input class="input" data-f="your_share" type="number" step="0.01" min="0" max="100" value="${d.your_share ?? ''}"></label>
+        <label class="field"><span>BPM</span><input class="input" data-f="bpm" type="number" min="0" value="${d.bpm ?? ''}"></label>
+        <label class="field"><span>Key</span><input class="input" data-f="song_key" value="${esc(d.song_key || '')}"></label>
+        <label class="field"><span>Alt title</span><input class="input" data-f="alt_title" value="${esc(d.alt_title || '')}"></label>
+        <label class="field"><span>ISWC</span><input class="input" data-f="iswc" value="${esc(d.iswc || '')}"></label>
+      </div>
+      <label class="field" style="margin-top:12px"><span>Demo link</span><input class="input" data-f="demo_url" type="url" placeholder="Dropbox, Disco, Drive…" value="${esc(d.demo_url || '')}"></label>
+    </div>
+
+    <div class="card">
+      <h3>Tags <span class="aside">Used to match songs to artists</span></h3>
+      ${SINGLE_TAGS.map(([field, cat, label]) => `
+        <div class="taggrp"><div class="lbl">${label}</div><div class="chips">
+          ${(tagOpts[cat] || []).map(v => `<button class="chip" data-single="${field}" data-v="${esc(v)}" aria-pressed="${d[field] === v}">${esc(v)}</button>`).join('')}
+        </div></div>`).join('')}
+      ${MULTI_TAGS.map(([field, cat, label]) => `
+        <div class="taggrp"><div class="lbl">${label}</div><div class="chips">
+          ${(tagOpts[cat] || []).map(v => `<button class="chip" data-multi="${field}" data-v="${esc(v)}" aria-pressed="${(d[field] || []).includes(v)}">${esc(v)}</button>`).join('')}
+        </div></div>`).join('')}
+      <label class="field" style="margin-bottom:12px"><span>Sounds like (artists or songs, comma separated)</span><input class="input" data-f="sounds_like" value="${esc((d.sounds_like || []).join(', '))}"></label>
+      <button class="toggle" data-toggle="sync_ready"><span>Sync-ready</span><span class="pill ${d.sync_ready ? 'on' : ''}">${d.sync_ready ? 'Yes' : 'No'}</span></button>
+      <button class="toggle" data-toggle="master_owned"><span>I own the master</span><span class="pill ${d.master_owned ? 'on' : ''}">${d.master_owned ? 'Yes' : 'No'}</span></button>
+    </div>
+
+    <div class="card">
+      <h3>Rights <span class="aside">Shares are % of the whole song</span></h3>
+      <div class="subhead" style="margin-top:0">Writers</div>
+      <div id="d-writers">${partyRows('writers')}</div>
+      <button class="addrow" data-add="writers">Add writer</button>
+      <div class="subhead">Publishers</div>
+      <div id="d-pubs">${partyRows('publishers')}</div>
+      <button class="addrow" data-add="publishers">Add publisher</button>
+      <div class="totals" id="d-totals"></div>
+      ${works.length ? `<div class="subhead">Work numbers</div><div class="works">${works.map(w => `
+        <div class="w"><span class="mono">${esc(w.pro)} ${esc(w.work_no)}</span>${w.society_status ? `<span class="pill ${/conflict/i.test(w.society_status) ? 'warn' : /reconciled/i.test(w.society_status) ? 'blue' : ''}">${esc(w.society_status)}</span>` : ''}</div>`).join('')}</div>` : ''}
+    </div>
+
+    ${isNew ? '' : `
+    <div class="card">
+      <h3>Best fits <span class="aside">From your Pitch Log artist sheets</span></h3>
+      <div id="d-fits"><div class="hint">Loading…</div></div>
+    </div>`}
+
+    <label class="field" style="margin-bottom:18px"><span>Notes</span><textarea class="input" data-f="notes">${esc(d.notes || '')}</textarea></label>
+
+    <div class="savebar">
+      <span class="status" id="d-status">${isNew ? 'Not saved yet' : 'No changes'}</span>
+      ${isNew ? '' : '<button class="btn danger small" id="d-delete">Delete</button>'}
+      <button class="btn primary" id="d-save">${isNew ? 'Add to catalog' : 'Save changes'}</button>
+    </div>`;
+  updateTotals();
+  setDirty(dirty);
+}
+
+function partyRows(side) {
+  const list = draft[side] || [];
+  const pros = ['SESAC', 'BMI', 'ASCAP', 'GMR', 'SOCAN', 'PRS', 'UNKNOWN'];
+  return list.map((p, i) => `
+    <div class="party">
+      <input class="input" data-party="${side}" data-i="${i}" data-k="name" value="${esc(p.name || '')}" placeholder="Name" aria-label="Name">
+      <select class="input" data-party="${side}" data-i="${i}" data-k="pro" aria-label="PRO">
+        ${[...new Set([...(p.pro && !pros.includes(p.pro) ? [p.pro] : []), ...pros])].map(v => `<option ${p.pro === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}
+      </select>
+      <input class="input mono" data-party="${side}" data-i="${i}" data-k="share" type="number" step="0.01" min="0" max="100" value="${p.share ?? p.pct ?? ''}" aria-label="Share %">
+      <button class="x" data-remove="${side}" data-i="${i}" aria-label="Remove">×</button>
+    </div>`).join('');
+}
+
+function shareOf(p) { return parseFloat(p.share ?? p.pct) || 0; }
+function updateTotals() {
+  const el = $('#d-totals'); if (!el) return;
+  const w = (draft.writers || []).reduce((a, p) => a + shareOf(p), 0);
+  const p = (draft.publishers || []).reduce((a, x) => a + shareOf(x), 0);
+  const t = Math.round((w + p) * 100) / 100;
+  const ok = Math.abs(t - 100) < 0.5;
+  el.className = 'totals ' + (ok ? 'ok' : 'bad');
+  el.textContent = `Writers ${Math.round(w * 100) / 100}% + publishers ${Math.round(p * 100) / 100}% = ${t}%` + (ok ? '' : ' (should total 100%)');
+}
+
+function setDirty(v) {
+  dirty = v;
+  const st = $('#d-status'); if (!st) return;
+  if (!draft.id) st.textContent = 'Not saved yet';
+  else st.textContent = v ? 'Unsaved changes' : 'All changes saved';
+}
+
+/* Detail panel events (delegated) */
+$('#detail').addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'd-title') { draft.title = t.value; setDirty(true); return; }
+  if (t.dataset.f) { readField(t); setDirty(true); return; }
+  if (t.dataset.party) {
+    const row = draft[t.dataset.party][+t.dataset.i];
+    row[t.dataset.k] = t.dataset.k === 'share' ? (t.value === '' ? null : parseFloat(t.value)) : t.value;
+    if (t.dataset.k === 'share') delete row.pct;
+    updateTotals(); setDirty(true);
+  }
+});
+$('#detail').addEventListener('change', e => { const t = e.target; if (t.tagName === 'SELECT') { if (t.dataset.f) readField(t); if (t.dataset.party) draft[t.dataset.party][+t.dataset.i][t.dataset.k] = t.value; setDirty(true); } });
+function readField(t) {
+  const f = t.dataset.f; let v = t.value;
+  if (f === 'bpm') v = v === '' ? null : parseInt(v, 10);
+  else if (f === 'your_share') v = v === '' ? null : parseFloat(v);
+  else if (f === 'sounds_like') v = v.split(',').map(x => x.trim()).filter(Boolean);
+  else if (v === '' && f !== 'status') v = null;
+  draft[f] = v;
+}
+$('#detail').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'd-back') { if (dirty && !confirm('You have unsaved changes. Discard them?')) return; dirty = false; $('#detail').classList.remove('open'); return; }
+  if (b.id === 'd-save') { saveDraft(); return; }
+  if (b.id === 'd-delete') { deleteSong(); return; }
+  if (b.dataset.single) {
+    const f = b.dataset.single; draft[f] = draft[f] === b.dataset.v ? null : b.dataset.v;
+    $$(`[data-single="${f}"]`).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === draft[f])));
+    setDirty(true); return;
+  }
+  if (b.dataset.multi) {
+    const f = b.dataset.multi, v = b.dataset.v; const arr = draft[f] || (draft[f] = []);
+    const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v);
+    b.setAttribute('aria-pressed', String(arr.includes(v))); setDirty(true); return;
+  }
+  if (b.dataset.toggle) {
+    const f = b.dataset.toggle; draft[f] = !draft[f];
+    const pill = b.querySelector('.pill'); pill.className = 'pill' + (draft[f] ? ' on' : ''); pill.textContent = draft[f] ? 'Yes' : 'No';
+    setDirty(true); return;
+  }
+  if (b.dataset.add) {
+    (draft[b.dataset.add] ||= []).push({ name: '', pro: 'SESAC', share: null });
+    $(b.dataset.add === 'writers' ? '#d-writers' : '#d-pubs').innerHTML = partyRows(b.dataset.add);
+    updateTotals(); setDirty(true); return;
+  }
+  if (b.dataset.remove) {
+    draft[b.dataset.remove].splice(+b.dataset.i, 1);
+    $(b.dataset.remove === 'writers' ? '#d-writers' : '#d-pubs').innerHTML = partyRows(b.dataset.remove);
+    updateTotals(); setDirty(true); return;
+  }
+});
+
+async function loadSongExtras(id) {
+  // Income by statement
+  const incEl = $('#d-income');
+  if (incEl) {
+    const { data, error } = await db().from('royalty_song_totals')
+      .select('amount, royalty_statements(pro, period, income_type)').eq('song_id', id);
+    if (selectedId !== id) return;
+    if (error) incEl.innerHTML = `<div class="hint">${esc(error.message)}</div>`;
+    else if (!data.length) incEl.innerHTML = '<div class="hint" style="margin-top:8px">Nothing paid on this song in the statements you’ve imported.</div>';
+    else {
+      data.sort((a, b) => String(b.royalty_statements?.period).localeCompare(String(a.royalty_statements?.period)));
+      incEl.innerHTML = data.map(r => `<div class="ln"><span>${esc(r.royalty_statements?.pro || '')} ${esc(r.royalty_statements?.period || '')}</span><span class="hint">${esc(r.royalty_statements?.income_type || '')}</span><span class="amt">${money(r.amount)}</span></div>`).join('');
+    }
+  }
+  // Best fits
+  const fitEl = $('#d-fits');
+  if (fitEl) {
+    const { data, error } = await db().from('song_artist_matches').select('*').eq('song_id', id).order('score', { ascending: false }).limit(5);
+    if (selectedId !== id) return;
+    const s = songs.find(x => x.id === id);
+    if (error) fitEl.innerHTML = `<div class="hint">${esc(error.message)}</div>`;
+    else if (!isTagged(s)) fitEl.innerHTML = '<div class="hint">Tag this song’s vocal, tempo, sub-genre and topics to see which artists it fits.</div>';
+    else if (!data.length || data.every(m => m.score <= 0)) fitEl.innerHTML = '<div class="hint">No matches yet. Artist sheets in Pitch Log need style tags before songs can be scored against them.</div>';
+    else fitEl.innerHTML = data.filter(m => m.score > 0).map(m => {
+      const why = [['Vocal', m.gender_pts], ['Genre', m.genre_pts], ['Themes', m.theme_pts], ['Mood', m.mood_pts], ['Tempo', m.tempo_pts], ['Outside songs', m.outside_pts], ['Cut window', m.timing_pts]]
+        .filter(([, v]) => v).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(' · ');
+      return `<div class="fit"><span style="min-width:0"><div style="font-weight:700">${esc(m.artist_name)} ${m.already_pitched ? '<span class="pill blue">Pitched</span>' : ''}</div><div class="why">${esc(why)}</div></span>
+        <span class="bar"><span style="width:${Math.min(100, Math.round(m.score / 18 * 100))}%"></span></span>
+        <span class="mono" style="text-align:right;font-weight:600">${m.score}</span></div>`;
+    }).join('');
+  }
+}
+
+function cleanParties(list) {
+  return (list || []).filter(p => (p.name || '').trim()).map(p => {
+    const o = { ...p, name: p.name.trim(), share: shareOf(p) }; delete o.pct; return o;
+  });
+}
+
+async function saveDraft() {
+  if (!draft.title || !draft.title.trim()) { toast('Add a title before saving.', true); $('#d-title')?.focus(); return; }
+  const btn = $('#d-save'); btn.disabled = true;
+  const row = {
+    title: draft.title.trim(), alt_title: draft.alt_title || null, status: draft.status || 'Available',
+    iswc: draft.iswc || null, bpm: draft.bpm ?? null, song_key: draft.song_key || null,
+    vocal_gender: draft.vocal_gender || null, tempo_feel: draft.tempo_feel || null, demo_level: draft.demo_level || null, pov: draft.pov || null,
+    sub_genres: draft.sub_genres || [], topics: draft.topics || [], moods: draft.moods || [], sounds_like: draft.sounds_like || [],
+    demo_url: draft.demo_url || null, sync_ready: !!draft.sync_ready, master_owned: !!draft.master_owned,
+    writers: cleanParties(draft.writers), publishers: cleanParties(draft.publishers),
+    your_share: draft.your_share ?? null, notes: draft.notes || null
+  };
+  let res;
+  if (draft.id) res = await db().from('songs').update(row).eq('id', draft.id).select().single();
+  else res = await db().from('songs').insert({ ...row, user_id: user.id }).select().single();
+  btn.disabled = false;
+  if (res.error) { toast('Couldn’t save: ' + res.error.message, true); return; }
+  const saved = res.data; const wasNew = !draft.id;
+  const i = songs.findIndex(s => s.id === saved.id);
+  if (i >= 0) songs[i] = saved; else songs.push(saved);
+  draft = JSON.parse(JSON.stringify(saved)); selectedId = saved.id; dirty = false;
+  renderRows();
+  if (wasNew) { renderDetail(); loadSongExtras(saved.id); toast(`Added “${saved.title}” to your catalog`); }
+  else { setDirty(false); toast('Changes saved'); }
+}
+
+async function deleteSong() {
+  const inc = incomeBySong.get(draft.id)?.total || 0;
+  const warn = inc ? `\n\nIts ${money(inc)} of income will no longer be attached to a song.` : '';
+  if (!confirm(`Delete “${draft.title}” from your catalog? This can’t be undone.${warn}`)) return;
+  const { error } = await db().from('songs').delete().eq('id', draft.id);
+  if (error) { toast('Couldn’t delete: ' + error.message, true); return; }
+  songs = songs.filter(s => s.id !== draft.id);
+  toast(`Deleted “${draft.title}”`);
+  draft = null; selectedId = null; dirty = false;
+  $('#detail').classList.remove('open');
+  $('#detail').innerHTML = '<div class="detail-empty">Choose a song to see its income, rights and tags.</div>';
+  renderRows();
+}
+
+/* =====================================================================
+   VIEWS
+   ===================================================================== */
+$$('nav.tabs button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+function showView(v) {
+  $$('nav.tabs button').forEach(b => { if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  ['catalog', 'import', 'vault'].forEach(x => $('#view-' + x).classList.toggle('hidden', x !== v));
+  if (v === 'vault') checkVault();
+}
+
+/* =====================================================================
+   STATEMENT IMPORT (SESAC CSV)
+   ===================================================================== */
+const drop = $('#drop');
+$('#stmtFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) readStatement(f); e.target.value = ''; });
+['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) readStatement(f); });
+
+function parseCSV(text) {
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += c;
+  }
+  if (f !== '' || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+function monthDate(str, end) {
+  const m = String(str).trim().match(/([A-Za-z]+)\s+(\d{4})/); if (!m) return null;
+  const mi = MONTHS.indexOf(m[1].toLowerCase()); if (mi < 0) return null;
+  const y = +m[2]; const d = end ? new Date(Date.UTC(y, mi + 1, 0)) : new Date(Date.UTC(y, mi, 1));
+  return d.toISOString().slice(0, 10);
+}
+function longDate(str) { const d = new Date(String(str).trim() + ' UTC'); return isNaN(d) ? null : d.toISOString().slice(0, 10); }
+
+let stmt = null;
+async function readStatement(file) {
+  const text = await file.text();
+  const rows = parseCSV(text);
+  const out = $('#importResult');
+  const first = (rows[0] || []).join(',');
+  if (!/SESAC/i.test(first) || !/Royalty Statement/i.test(first)) {
+    out.innerHTML = `<div class="banner bad">This doesn’t look like a SESAC royalty statement CSV. The first line should start with “SESAC … Royalty Statement”. BMI statement imports aren’t supported yet.</div>`;
+    return;
+  }
+  const headerLine = (label) => { const r = rows.slice(0, 8).find(r => r.join(',').toLowerCase().startsWith(label.toLowerCase())); return r ? r.join(',').split(':').slice(1).join(':').trim() : ''; };
+  const periodRaw = (first.match(/(\d{4})\s*\/\s*(\d)/) || []);
+  const period = periodRaw.length ? `${periodRaw[1]} Q${periodRaw[2]}` : '';
+  const affiliate = headerLine('Affiliate No');
+  const distPeriod = headerLine('Distribution Period');
+  const [ps, pe] = distPeriod.split('-');
+  const distDate = headerLine('Distribution Date').replace(/"/g, '');
+
+  const hi = rows.findIndex(r => r.includes('Song #') && r.includes('Earnings'));
+  if (hi < 0) { out.innerHTML = `<div class="banner bad">Couldn’t find the column headers (Song #, Earnings) in this file.</div>`; return; }
+  const H = rows[hi]; const cNo = H.indexOf('Song #'), cTitle = H.indexOf('Song Title'), cShare = H.indexOf('%Shares'), cEarn = H.indexOf('Earnings');
+  const works = new Map(); let lines = 0;
+  for (const r of rows.slice(hi + 1)) {
+    const no = parseFloat(r[cNo]); if (!isFinite(no)) continue;
+    const key = String(Math.round(no)); lines++;
+    const w = works.get(key) || { work_no: key, title: (r[cTitle] || '').trim(), share: parseFloat(r[cShare]) || 0, amount: 0 };
+    w.amount += parseFloat(r[cEarn]) || 0;
+    works.set(key, w);
+  }
+  const list = [...works.values()].sort((a, b) => b.amount - a.amount);
+  list.forEach(w => { w.song_id = workIndex.get('SESAC:' + w.work_no) || null; });
+  stmt = {
+    file: file.name, pro: 'SESAC', affiliate, period,
+    period_start: ps ? monthDate(ps, false) : null, period_end: pe ? monthDate(pe, true) : null,
+    distribution_date: longDate(distDate), income_type: 'Writer', works: list, lines,
+    total: list.reduce((a, w) => a + w.amount, 0), createMissing: true, duplicate: false
+  };
+  await checkDuplicate();
+  renderStatement();
+}
+async function checkDuplicate() {
+  const { data } = await db().from('royalty_statements').select('id,imported_at')
+    .eq('pro', stmt.pro).eq('affiliate_no', stmt.affiliate).eq('period', stmt.period).eq('income_type', stmt.income_type).limit(1);
+  stmt.duplicate = !!(data && data.length);
+}
+function renderStatement() {
+  const s = stmt; const matched = s.works.filter(w => w.song_id).length; const unmatched = s.works.length - matched;
+  const pd = s.distribution_date ? new Date(s.distribution_date + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+  $('#importResult').innerHTML = `
+    ${s.duplicate ? `<div class="banner warn">This statement (${esc(s.pro)} ${esc(s.period)}, ${esc(s.income_type.toLowerCase())} income) is already in your catalog. Importing it again would count the income twice, so it’s blocked.</div>` : ''}
+    <div class="facts">
+      <div class="fact"><span class="k">PRO</span><span class="v">${esc(s.pro)}</span><span class="hint mono">Affiliate ${esc(s.affiliate)}</span></div>
+      <div class="fact"><span class="k">Period</span><span class="v">${esc(s.period)}</span><span class="hint">${pd ? 'Paid ' + esc(pd) : ''}</span></div>
+      <div class="fact"><span class="k">Statement total</span><span class="v mono">${money(s.total)}</span><span class="hint">${s.works.length} songs, ${s.lines} lines</span></div>
+      <div class="fact"><span class="k">Income type</span>
+        <div class="seg" role="group" aria-label="Income type">
+          <button data-itype="Writer" aria-pressed="${s.income_type === 'Writer'}">Writer</button>
+          <button data-itype="Publisher" aria-pressed="${s.income_type === 'Publisher'}">Publisher</button>
+        </div></div>
+    </div>
+    <div class="banner info">${matched} of ${s.works.length} songs matched by SESAC song number.${unmatched ? ` ${unmatched} aren’t in your catalog yet.` : ''}</div>
+    ${unmatched ? `<label class="checkline"><input type="checkbox" id="createMissing" ${s.createMissing ? 'checked' : ''}> Add the ${unmatched} unmatched songs to the catalog with their SESAC numbers</label>` : ''}
+    <div class="table">
+      <div class="tr"><span>Song</span><span class="hide-m">SESAC #</span><span class="hide-m">Match</span><span class="r">This statement</span></div>
+      ${s.works.slice(0, 25).map(w => `<div class="tr"><span style="font-weight:700">${esc(w.title)}</span><span class="hide-m mono">${esc(w.work_no)}</span><span class="hide-m">${w.song_id ? 'In catalog' : '<span class="pill warn">New</span>'}</span><span class="r">${money(w.amount)}</span></div>`).join('')}
+      ${s.works.length > 25 ? `<div class="tr"><span class="hint">And ${s.works.length - 25} more songs</span><span class="hide-m"></span><span class="hide-m"></span><span></span></div>` : ''}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn" id="stmtCancel">Cancel</button>
+      <button class="btn primary" id="stmtGo" ${s.duplicate ? 'disabled' : ''}>Import ${money(s.total)}</button>
+    </div>`;
+}
+$('#importResult').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.itype) { stmt.income_type = b.dataset.itype; await checkDuplicate(); renderStatement(); }
+  if (b.id === 'stmtCancel') { stmt = null; $('#importResult').innerHTML = ''; }
+  if (b.id === 'stmtGo') importStatement(b);
+});
+$('#importResult').addEventListener('change', e => { if (e.target.id === 'createMissing') stmt.createMissing = e.target.checked; });
+
+async function importStatement(btn) {
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    const s = stmt;
+    // 1) statement row (the unique rule blocks a second copy)
+    const { data: st, error: e1 } = await db().from('royalty_statements').insert({
+      user_id: user.id, pro: s.pro, affiliate_no: s.affiliate, period: s.period,
+      period_start: s.period_start, period_end: s.period_end, distribution_date: s.distribution_date,
+      income_type: s.income_type, source_file: s.file, total: Math.round(s.total * 1e6) / 1e6
+    }).select().single();
+    if (e1) throw e1;
+    // 2) new songs for unmatched works
+    const missing = s.works.filter(w => !w.song_id);
+    if (missing.length && s.createMissing) {
+      for (let i = 0; i < missing.length; i += 200) {
+        const chunk = missing.slice(i, i + 200);
+        const { data: made, error } = await db().from('songs').insert(chunk.map(w => ({ user_id: user.id, title: w.title, your_share: Math.round(w.share * 10000) / 100, status: 'Available' }))).select('id');
+        if (error) throw error;
+        chunk.forEach((w, j) => { w.song_id = made[j].id; });
+        const { error: e2 } = await db().from('song_pro_ids').insert(chunk.map(w => ({ user_id: user.id, song_id: w.song_id, pro: 'SESAC', work_no: w.work_no, title_on_statement: w.title })));
+        if (e2) throw e2;
+      }
+    }
+    // 3) one amount per song
+    const lines = s.works.map(w => ({ user_id: user.id, statement_id: st.id, song_id: w.song_id, work_no: w.work_no, title_on_statement: w.title, amount: Math.round(w.amount * 1e8) / 1e8 }));
+    for (let i = 0; i < lines.length; i += 500) {
+      const { error } = await db().from('royalty_song_totals').insert(lines.slice(i, i + 500));
+      if (error) throw error;
+    }
+    await loadAll(); renderCatalog();
+    $('#importResult').innerHTML = `<div class="banner info">Imported ${money(s.total)} across ${s.works.length} songs. Each song’s total income is updated.</div>`;
+    toast(`Imported ${s.pro} ${s.period}`);
+    stmt = null;
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Try again';
+    const dup = /duplicate key/i.test(e.message || '');
+    toast(dup ? 'This statement was already imported.' : 'Import failed: ' + e.message, true);
+  }
+}
+
+/* =====================================================================
+   SONG VAULT CHECK
+   ===================================================================== */
+let myNames = new Set(), myIpis = new Set();
+async function loadMyIdentity() {
+  const [{ data: ws }, { data: st }] = await Promise.all([
+    vaultDb().from('writers').select('name,ipi').eq('user_id', user.id),
+    vaultDb().from('settings').select('my_name,my_ipi').eq('user_id', user.id).limit(1)
+  ]);
+  (ws || []).forEach(w => { if (w.name) myNames.add(norm(w.name)); if (w.ipi) myIpis.add(String(w.ipi).replace(/\D/g, '')); });
+  (st || []).forEach(s => { if (s.my_name) myNames.add(norm(s.my_name)); if (s.my_ipi) myIpis.add(String(s.my_ipi).replace(/\D/g, '')); });
+}
+function isMe(p) { return myNames.has(norm(p.name)) || (p.ipi && myIpis.has(String(p.ipi).replace(/\D/g, ''))); }
+
+async function checkVault() {
+  const el = $('#vaultList');
+  try {
+    if (!myNames.size) await loadMyIdentity();
+    const vs = await fetchAll(() => vaultDb().from('songs').select('id,title,alt_title,iswc,bpm,key,writers,publishers,updated_at').eq('user_id', user.id).order('updated_at', { ascending: false }));
+    const linked = new Set(songs.map(s => s.song_vault_id).filter(Boolean));
+    vaultPending = vs.filter(v => !linked.has(v.id));
+    $('#vaultCount').textContent = vaultPending.length ? String(vaultPending.length) : '';
+    if (!vaultPending.length) { el.innerHTML = '<div class="empty">Everything in Song Vault is already in your catalog.</div>'; return; }
+    const byTitle = new Map(); songs.forEach(s => { byTitle.set(norm(s.title), s); if (s.alt_title) byTitle.set(norm(s.alt_title), s); });
+    el.innerHTML = `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn outline" id="addAllVault">Add all ${vaultPending.length} as new songs</button></div>
+      <div class="table">${vaultPending.map(v => {
+        const conv = convertVault(v); const twin = byTitle.get(norm(v.title));
+        const names = conv.writers.map(w => w.name).join(', ');
+        return `<div class="vault-item" data-vid="${v.id}">
+          <div><div class="t">${esc(v.title)}</div>
+          <div class="m">${esc(names || 'No writers entered yet')}${conv.your_share != null ? ' · your share ' + conv.your_share + '%' : ''}</div>
+          ${twin ? `<div class="m" style="color:var(--amber-text)">Your catalog already has “${esc(twin.title)}”. Link them if it’s the same song.</div>` : ''}</div>
+          <div class="actions">
+            ${twin ? `<button class="btn small outline" data-link="${v.id}" data-to="${twin.id}">Link to existing</button>` : ''}
+            <button class="btn small ${twin ? '' : 'primary'}" data-addv="${v.id}">Add as new song</button>
+          </div></div>`;
+      }).join('')}</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="banner bad">Couldn’t read Song Vault: ${esc(e.message)}</div>`;
+  }
+}
+
+/* Song Vault stores writer % of the writer side and publisher % of the publisher side
+   (each adds to 100). The catalog stores % of the whole song, so both are halved. */
+function convertVault(v) {
+  const writers = (v.writers || []).filter(w => w.name).map(w => ({ name: w.name.trim(), ipi: w.ipi || '', pro: w.pro || 'UNKNOWN', share: (parseFloat(w.pct) || 0) / 2 }));
+  let publishers = (v.publishers || []).filter(p => p.name).map(p => ({ name: p.name.trim(), ipi: p.ipi || '', pro: p.pro || 'UNKNOWN', share: (parseFloat(p.pct) || 0) / 2 }));
+  if (!publishers.length) publishers = (v.writers || []).filter(w => w.pub_name).map(w => ({ name: w.pub_name.trim(), ipi: w.pub_ipi || '', pro: w.pub_pro || 'UNKNOWN', share: (parseFloat(w.pct) || 0) / 2 }));
+  const mine = writers.filter(isMe);
+  const your_share = mine.length ? Math.round(mine.reduce((a, w) => a + w.share, 0) * 100) / 100 : null;
+  return {
+    title: (v.title || '').trim(), alt_title: v.alt_title || null, iswc: v.iswc || null,
+    bpm: parseInt(v.bpm, 10) || null, song_key: v.key || null, writers, publishers, your_share,
+    song_vault_id: v.id, status: 'Available', user_id: user.id
+  };
+}
+
+$('#vaultList').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'addAllVault') {
+    if (!confirm(`Add all ${vaultPending.length} Song Vault songs to your catalog as new songs?`)) return;
+    b.disabled = true;
+    const { error } = await db().from('songs').insert(vaultPending.map(convertVault));
+    if (error) { toast('Couldn’t add: ' + error.message, true); b.disabled = false; return; }
+    toast(`Added ${vaultPending.length} songs from Song Vault`);
+  } else if (b.dataset.addv) {
+    const v = vaultPending.find(x => x.id === b.dataset.addv); b.disabled = true;
+    const { error } = await db().from('songs').insert(convertVault(v));
+    if (error) { toast('Couldn’t add: ' + error.message, true); b.disabled = false; return; }
+    toast(`Added “${v.title}” to your catalog`);
+  } else if (b.dataset.link) {
+    const v = vaultPending.find(x => x.id === b.dataset.link); b.disabled = true;
+    const { error } = await db().from('songs').update({ song_vault_id: v.id }).eq('id', b.dataset.to);
+    if (error) { toast('Couldn’t link: ' + error.message, true); b.disabled = false; return; }
+    toast(`Linked “${v.title}” to the catalog song`);
+  } else return;
+  await loadAll(); renderCatalog(); checkVault();
+});
+
+/* Warn before leaving with unsaved edits */
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+</script>
+</body>
+</html>
