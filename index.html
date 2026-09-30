@@ -99,7 +99,10 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
 #detail { min-height: 0; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 24px 28px 40px; }
 .detail-empty { color: var(--muted); padding-top: 40px; line-height: 1.6; }
 .d-top { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
-.d-back { display: none; }
+.d-bar { position: sticky; top: 0; height: 0; z-index: 5; display: flex; justify-content: flex-end; }
+.d-close { width: 44px; height: 44px; margin: -12px -14px 0 0; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--raised); color: var(--text-2); font-size: 26px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0 0 3px; }
+.d-close:hover { color: var(--text); border-color: var(--muted); }
+.d-top .d-title { padding-right: 52px; }
 .d-title { font-size: 30px; font-weight: 800; font-stretch: 74%; letter-spacing: 0.01em; line-height: 1.05; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 4px 6px; margin: 0 -7px; width: calc(100% + 14px); color: var(--text); }
 .d-title:hover { border-color: var(--line); }
 .d-title:focus { border-color: var(--amber); outline: none; }
@@ -192,7 +195,6 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
   #view-catalog { grid-template-columns: 1fr; }
   #detail { position: fixed; inset: 0; z-index: 30; border-left: 0; padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 40px; transform: translateX(100%); transition: transform .22s ease; }
   #detail.open { transform: translateX(0); }
-  .d-back { display: inline-flex; align-self: flex-start; }
   .savebar { margin: 8px -18px -40px; padding-left: 18px; padding-right: 18px; }
   .list-head { padding: 16px 14px 12px; }
   .cols { display: none; }
@@ -557,6 +559,21 @@ $('#rows').addEventListener('click', e => {
 const SINGLE_TAGS = [['vocal_gender', 'vocal_gender', 'Vocal'], ['tempo_feel', 'tempo_feel', 'Tempo feel'], ['demo_level', 'demo_level', 'Demo level'], ['pov', 'pov', 'Point of view']];
 const MULTI_TAGS = [['sub_genres', 'sub_genre', 'Sub-genre'], ['topics', 'topic', 'Topics'], ['moods', 'mood', 'Mood']];
 
+function closeDetail() {
+  if (!draft && !selectedId) return;
+  if (dirty && !confirm('You have unsaved changes. Discard them?')) return;
+  dirty = false; draft = null; selectedId = null;
+  $('#detail').classList.remove('open');
+  $('#detail').innerHTML = '<div class="detail-empty">Choose a song to see its income, rights and tags.</div>';
+  $('#detail').scrollTop = 0;
+  $$('.row.sel').forEach(r => r.classList.remove('sel'));
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (e.target.closest && e.target.closest('input, textarea, select')) return;
+  closeDetail();
+});
+
 async function openSong(id) {
   if (dirty && !confirm('You have unsaved changes. Discard them?')) return;
   selectedId = id;
@@ -589,8 +606,8 @@ function renderDetail() {
   const metaBits = [d.registered_on ? 'Registered ' + d.registered_on : '', d.iswc ? 'ISWC ' + d.iswc : '', d.your_share != null ? 'Your share ' + Number(d.your_share) + '%' : ''].filter(Boolean);
 
   $('#detail').innerHTML = `
+    <div class="d-bar"><button class="d-close" id="d-close" aria-label="Close song panel" title="Close (Esc)"><span aria-hidden="true">×</span></button></div>
     <div class="d-top">
-      <button class="btn small d-back" id="d-back">Back to catalog</button>
       <input class="d-title" id="d-title" value="${esc(d.title)}" placeholder="Song title" aria-label="Song title">
       <div class="d-meta">${esc(metaBits.join(' · ') || (isNew ? 'New song' : ''))}</div>
     </div>
@@ -719,7 +736,7 @@ function readField(t) {
 }
 $('#detail').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.id === 'd-back') { if (dirty && !confirm('You have unsaved changes. Discard them?')) return; dirty = false; $('#detail').classList.remove('open'); return; }
+  if (b.id === 'd-close' || b.closest('#d-close')) { closeDetail(); return; }
   if (b.id === 'd-income-toggle') {
     incomeOpen = !incomeOpen;
     try { localStorage.setItem('slt_income_open', incomeOpen ? '1' : '0'); } catch (_) {}
