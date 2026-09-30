@@ -75,6 +75,12 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
 .seg button { height: 42px; padding: 0 14px; border: 0; background: transparent; color: var(--text-2); cursor: pointer; font-weight: 600; font-size: 13px; }
 .seg button + button { border-left: 1px solid var(--line-strong); }
 .seg button[aria-pressed="true"] { background: var(--amber); color: var(--ground); }
+#tagPanelBtn .count { color: var(--amber); margin-left: 4px; }
+.tagpanel { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 14px 16px 6px; max-height: 44vh; overflow-y: auto; }
+.tagpanel .taggrp { margin-bottom: 12px; }
+.tagpanel .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0 8px; border-top: 1px solid var(--line-soft); }
+.active-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.active-tags .chip { min-height: 30px; font-size: 12px; }
 .cols { display: grid; grid-template-columns: minmax(0, 2.6fr) 0.9fr 0.8fr 0.9fr 1fr; gap: 14px; padding: 10px 28px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line-soft); }
 .cols .r, .row .r { text-align: right; }
 #rows { flex-grow: 1; min-height: 0; overflow-y: auto; }
@@ -118,6 +124,9 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
 .taggrp > .lbl { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--line-strong); background: transparent; color: var(--text-2); font-weight: 600; font-size: 13px; cursor: pointer; }
+.chip.add { border-style: dashed; color: var(--muted); }
+.chip.add:hover { color: var(--text); border-color: var(--amber); }
+.chip-input { height: 36px; width: 160px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--amber); background: var(--raised); outline: none; }
 .chip[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: var(--ground); }
 .toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; border: 0; border-top: 1px solid var(--line-soft); background: transparent; cursor: pointer; font-weight: 600; font-size: 14px; padding: 0; color: var(--text); }
 .pill { height: 26px; display: inline-flex; align-items: center; padding: 0 11px; border-radius: 13px; font-size: 12px; font-weight: 700; background: var(--chip); color: #B9B3A7; }
@@ -247,19 +256,22 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
           </div>
         </div>
         <div class="controls">
-          <input class="input" id="search" type="search" placeholder="Search title, writer, or work number" aria-label="Search songs">
+          <input class="input" id="search" type="search" placeholder="Search title, writer, tag, sounds-like, or work #" aria-label="Search songs">
           <div class="seg" role="group" aria-label="Tagging">
             <button data-tagf="all" aria-pressed="true">All</button>
             <button data-tagf="tagged" aria-pressed="false">Tagged</button>
             <button data-tagf="untagged" aria-pressed="false">Untagged</button>
           </div>
           <select class="input" id="statusFilter" aria-label="Status"><option value="">Any status</option></select>
+          <button class="btn" id="tagPanelBtn" aria-expanded="false" aria-controls="tagPanel">Filter by tags<span class="count mono" id="tagSelCount"></span></button>
           <select class="input" id="sortBy" aria-label="Sort">
             <option value="income">Most income</option>
             <option value="title">Title A–Z</option>
             <option value="newest">Newest registered</option>
           </select>
         </div>
+        <div id="tagPanel" class="tagpanel hidden" aria-label="Tag filters"></div>
+        <div id="activeTags" class="active-tags hidden"></div>
       </div>
       <div class="cols"><span>Title</span><span>Status</span><span>Vocal</span><span>Tempo</span><span class="r">Total income</span></div>
       <div id="rows"></div>
@@ -322,6 +334,12 @@ let selectedId = null;
 let draft = null;               // song being edited in the panel
 let dirty = false;
 let tagFilter = 'all';
+let tagSel = {};                 // filter selections: field -> Set of values
+const FILTER_GROUPS = [
+  ['vocal_gender', 'vocal_gender', 'Vocal'], ['tempo_feel', 'tempo_feel', 'Tempo'], ['demo_level', 'demo_level', 'Demo level'],
+  ['sub_genres', 'sub_genre', 'Sub-genre'], ['topics', 'topic', 'Topics'], ['moods', 'mood', 'Mood'], ['flags', null, 'Sync']
+];
+const FLAG_VALUES = { 'Sync-ready': s => !!s.sync_ready, 'Master owned': s => !!s.master_owned };
 let incomeOpen = false;          // statement list in the income card starts collapsed
 try { incomeOpen = localStorage.getItem('slt_income_open') === '1'; } catch (_) {}
 let vaultPending = [];
@@ -425,6 +443,60 @@ function renderCatalog() {
   renderRows();
 }
 
+// Within a group a song needs any one of the picked values; across groups it needs all of them.
+function matchesTagSel(s) {
+  for (const [field, set] of Object.entries(tagSel)) {
+    if (!set.size) continue;
+    if (field === 'flags') { for (const f of set) if (!FLAG_VALUES[f](s)) return false; continue; }
+    const vals = Array.isArray(s[field]) ? s[field] : (s[field] ? [s[field]] : []);
+    if (!vals.some(v => set.has(v))) return false;
+  }
+  return true;
+}
+function tagSelCount() { return Object.values(tagSel).reduce((a, set) => a + set.size, 0); }
+function filterValues(field, cat) {
+  if (field === 'flags') return Object.keys(FLAG_VALUES);
+  const vals = [...(tagOpts[cat] || [])];
+  // include any custom values already on songs
+  songs.forEach(s => (Array.isArray(s[field]) ? s[field] : [s[field]]).forEach(v => { if (v && !vals.includes(v)) vals.push(v); }));
+  return vals;
+}
+function renderTagPanel() {
+  const panel = $('#tagPanel');
+  panel.innerHTML = FILTER_GROUPS.map(([field, cat, label]) => `
+    <div class="taggrp"><div class="lbl">${label}</div><div class="chips">
+      ${filterValues(field, cat).map(v => `<button class="chip" data-tsel="${field}" data-v="${esc(v)}" aria-pressed="${!!tagSel[field]?.has(v)}">${esc(v)}</button>`).join('')}
+    </div></div>`).join('') + `
+    <div class="foot"><span class="hint">Songs must match every group you use, and any one choice within a group.</span>
+      <button class="btn small" id="clearTags" ${tagSelCount() ? '' : 'disabled'}>Clear tag filters</button></div>`;
+}
+function renderActiveTags() {
+  const n = tagSelCount();
+  $('#tagSelCount').textContent = n ? String(n) : '';
+  const el = $('#activeTags');
+  el.classList.toggle('hidden', !n || !$('#tagPanel').classList.contains('hidden'));
+  el.innerHTML = 'Filtering by ' + Object.entries(tagSel).flatMap(([f, set]) => [...set].map(v =>
+    `<button class="chip" data-tsel="${f}" data-v="${esc(v)}" aria-pressed="true" aria-label="Remove ${esc(v)}">${esc(v)} ×</button>`)).join('') +
+    ' <button class="linkbtn" id="clearTags2">Clear</button>';
+}
+$('#tagPanelBtn').addEventListener('click', () => {
+  const panel = $('#tagPanel'); const open = panel.classList.contains('hidden');
+  if (open) renderTagPanel();
+  panel.classList.toggle('hidden', !open);
+  $('#tagPanelBtn').setAttribute('aria-expanded', String(open));
+  renderActiveTags();
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-tsel], #clearTags, #clearTags2'); if (!b) return;
+  if (b.id === 'clearTags' || b.id === 'clearTags2') tagSel = {};
+  else {
+    const set = tagSel[b.dataset.tsel] || (tagSel[b.dataset.tsel] = new Set());
+    if (set.has(b.dataset.v)) set.delete(b.dataset.v); else set.add(b.dataset.v);
+  }
+  if (!$('#tagPanel').classList.contains('hidden')) renderTagPanel();
+  renderActiveTags(); renderRows();
+});
+
 function filteredSongs() {
   const q = $('#search').value.trim().toLowerCase();
   const st = $('#statusFilter').value;
@@ -432,8 +504,12 @@ function filteredSongs() {
     if (tagFilter === 'tagged' && !isTagged(s)) return false;
     if (tagFilter === 'untagged' && isTagged(s)) return false;
     if (st && s.status !== st) return false;
+    if (!matchesTagSel(s)) return false;
     if (q) {
-      const hay = [s.title, s.alt_title, s.iswc, ...(s.writers || []).map(w => w.name), ...(workNos.get(s.id) || []).map(w => w.work_no)].join(' ').toLowerCase();
+      const hay = [s.title, s.alt_title, s.iswc, s.song_key, s.vocal_gender, s.tempo_feel, s.demo_level, s.pov,
+        ...(s.sub_genres || []), ...(s.topics || []), ...(s.moods || []), ...(s.sounds_like || []),
+        ...(s.writers || []).map(w => w.name), ...(s.publishers || []).map(p => p.name),
+        ...(workNos.get(s.id) || []).map(w => w.work_no)].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -450,8 +526,9 @@ function renderRows() {
   const list = filteredSongs();
   const tagged = songs.filter(isTagged).length;
   $('#catSummary').textContent = `${songs.length} songs, ${tagged} tagged. Showing ${list.length}.`;
+  $('#tagSelCount').textContent = tagSelCount() ? String(tagSelCount()) : '';
   if (!list.length) {
-    $('#rows').innerHTML = `<div class="empty">${songs.length ? 'No songs match. Clear the search or a filter.' : 'Your catalog is empty. Add a song, import a statement, or bring songs in from Song Vault.'}</div>`;
+    $('#rows').innerHTML = `<div class="empty">${songs.length ? (tagSelCount() && !tagged ? 'No songs are tagged yet. Tag songs from the song panel, then filter by those tags here.' : 'No songs match. Clear the search or a filter.') : 'Your catalog is empty. Add a song, import a statement, or bring songs in from Song Vault.'}</div>`;
     return;
   }
   // Render in one pass; 600+ rows is fine for the browser.
@@ -459,8 +536,9 @@ function renderRows() {
     const inc = incomeBySong.get(s.id)?.total || 0;
     const nums = (workNos.get(s.id) || []).map(w => w.pro + ' ' + w.work_no).join(', ');
     const share = s.your_share != null ? `your share ${Number(s.your_share)}%` : '';
+    const tags = [...(s.sub_genres || []), ...(s.topics || []), ...(s.moods || [])];
     return `<button class="row${s.id === selectedId ? ' sel' : ''}" data-id="${s.id}">
-      <span style="min-width:0"><div class="t">${esc(s.title)}</div><div class="m">${esc([nums, share].filter(Boolean).join(' · ') || 'No work number yet')}</div></span>
+      <span style="min-width:0"><div class="t">${esc(s.title)}</div><div class="m">${esc(tags.length ? tags.join(' · ') : ([nums, share].filter(Boolean).join(' · ') || 'No work number yet'))}</div></span>
       <span class="c">${esc(s.status || '')}</span>
       <span class="c">${esc(s.vocal_gender || '—')}</span>
       <span class="c">${esc(s.tempo_feel || '—')}</span>
@@ -549,6 +627,7 @@ function renderDetail() {
       ${MULTI_TAGS.map(([field, cat, label]) => `
         <div class="taggrp"><div class="lbl">${label}</div><div class="chips">
           ${(tagOpts[cat] || []).map(v => `<button class="chip" data-multi="${field}" data-v="${esc(v)}" aria-pressed="${(d[field] || []).includes(v)}">${esc(v)}</button>`).join('')}
+          <button class="chip add" data-addtag="${field}" data-cat="${cat}" aria-label="Add a new ${esc(label.toLowerCase())} tag">+ New</button>
         </div></div>`).join('')}
       <label class="field" style="margin-bottom:12px"><span>Sounds like (artists or songs, comma separated)</span><input class="input" data-f="sounds_like" value="${esc((d.sounds_like || []).join(', '))}"></label>
       <button class="toggle" data-toggle="sync_ready"><span>Sync-ready</span><span class="pill ${d.sync_ready ? 'on' : ''}">${d.sync_ready ? 'Yes' : 'No'}</span></button>
@@ -655,6 +734,21 @@ $('#detail').addEventListener('click', e => {
     $$(`[data-single="${f}"]`).forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === draft[f])));
     setDirty(true); return;
   }
+  if (b.dataset.addtag) {
+    const inp = document.createElement('input');
+    inp.className = 'chip-input'; inp.placeholder = 'New tag name'; inp.setAttribute('aria-label', 'New tag name');
+    b.replaceWith(inp); inp.focus();
+    let done = false;
+    const finish = async (save) => {
+      if (done) return; done = true;
+      const v = inp.value.trim();
+      if (save && v) await addTagOption(b.dataset.addtag, b.dataset.cat, v);
+      else renderDetailKeepExtras();
+    };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } if (e.key === 'Escape') finish(false); });
+    inp.addEventListener('blur', () => finish(true));
+    return;
+  }
   if (b.dataset.multi) {
     const f = b.dataset.multi, v = b.dataset.v; const arr = draft[f] || (draft[f] = []);
     const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v);
@@ -676,6 +770,24 @@ $('#detail').addEventListener('click', e => {
     updateTotals(); setDirty(true); return;
   }
 });
+
+function renderDetailKeepExtras() { renderDetail(); if (draft?.id) loadSongExtras(draft.id); }
+
+// Save a new tag value to your own tag list and switch it on for this song.
+async function addTagOption(field, cat, value) {
+  const existing = (tagOpts[cat] || []).find(v => v.toLowerCase() === value.toLowerCase());
+  let use = existing;
+  if (!existing) {
+    const { error } = await db().from('tag_options').insert({ user_id: user.id, category: cat, value, sort_order: 999 });
+    if (error) { toast('Couldn’t add that tag: ' + error.message, true); renderDetailKeepExtras(); return; }
+    (tagOpts[cat] ||= []).push(value); use = value;
+    toast(`Added “${value}” to your ${cat.replace('_', '-')} tags`);
+  }
+  const arr = draft[field] || (draft[field] = []);
+  if (!arr.includes(use)) arr.push(use);
+  setDirty(true);
+  renderDetailKeepExtras();
+}
 
 async function loadSongExtras(id) {
   // Income by statement
