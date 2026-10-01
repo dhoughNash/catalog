@@ -172,6 +172,12 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
 .tr { display: grid; grid-template-columns: minmax(0, 2fr) 1fr 0.8fr 1fr; gap: 14px; padding: 11px 18px; border-top: 1px solid var(--line-soft); align-items: center; font-size: 14px; }
 .tr:first-child { border-top: 0; background: var(--panel); font-size: 12px; color: var(--muted); }
 .tr .r { text-align: right; font-family: var(--mono); }
+.st-row { display: grid; grid-template-columns: minmax(0, 1.6fr) 1fr 0.9fr 0.8fr 0.8fr 1.1fr auto; gap: 14px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line-soft); font-size: 14px; }
+.st-row.head { border-top: 0; background: var(--panel); font-size: 12px; color: var(--muted); }
+.st-row .r { text-align: right; font-family: var(--mono); font-weight: 600; }
+.st-row .t { font-weight: 700; }
+.st-row .m { font-size: 12px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-actions { display: flex; gap: 6px; }
 .vault-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line-soft); }
 .vault-item:first-child { border-top: 0; }
 .vault-item .t { font-weight: 700; font-size: 15px; }
@@ -205,6 +211,9 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
   .tr .hide-m { display: none; }
   .page-inner { padding: 18px 14px 60px; }
   .vault-item { grid-template-columns: 1fr; }
+  .st-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .st-row .hide-m { display: none; }
+  .st-row.head { display: none; }
   .actions { justify-content: flex-start; }
   .party { grid-template-columns: minmax(0, 1fr) 80px 64px 36px; }
 }
@@ -235,6 +244,7 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
     </div>
     <nav class="tabs" aria-label="Sections">
       <button data-view="catalog" aria-current="page">Catalog</button>
+      <button data-view="statements">Statements</button>
       <button data-view="import">Import statement</button>
       <button data-view="vault">Song Vault<span class="count" id="vaultCount"></span></button>
     </nav>
@@ -296,6 +306,28 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
         <input type="file" id="stmtFile" accept=".csv,.pdf,text/csv,application/pdf" class="hidden">
       </label>
       <div id="importResult"></div>
+    </div>
+  </section>
+
+  <!-- STATEMENTS -->
+  <section class="view page hidden" id="view-statements">
+    <div class="page-inner">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap">
+        <div>
+          <h1>Statements</h1>
+          <div class="sub" id="stSummary">Loading…</div>
+        </div>
+        <button class="btn primary" id="stImportBtn">Import a statement</button>
+      </div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Kind">
+          <button data-stk="all" aria-pressed="true">All</button>
+          <button data-stk="quarterly" aria-pressed="false">Quarterly</button>
+          <button data-stk="monthly" aria-pressed="false">Monthly</button>
+        </div>
+        <select class="input" id="stPro" aria-label="Source"><option value="">All sources</option></select>
+      </div>
+      <div class="table" id="stTable"><div class="empty">Loading…</div></div>
     </div>
   </section>
 
@@ -894,8 +926,9 @@ async function deleteSong() {
 $$('nav.tabs button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
 function showView(v) {
   $$('nav.tabs button').forEach(b => { if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  ['catalog', 'import', 'vault'].forEach(x => $('#view-' + x).classList.toggle('hidden', x !== v));
+  ['catalog', 'import', 'statements', 'vault'].forEach(x => $('#view-' + x).classList.toggle('hidden', x !== v));
   if (v === 'vault') checkVault();
+  if (v === 'statements') loadStatements();
 }
 
 /* =====================================================================
@@ -1310,6 +1343,73 @@ $('#vaultList').addEventListener('click', async e => {
     toast(`Linked “${v.title}” to the catalog song`);
   } else return;
   await loadAll(); renderCatalog(); checkVault();
+});
+
+/* =====================================================================
+   STATEMENTS LIST — every imported statement, with delete and rename
+   ===================================================================== */
+let stRows = [], stKind = 'all';
+const stKindOf = r => /\(monthly\)/i.test(r.period) ? 'monthly' : 'quarterly';
+$('#stImportBtn').addEventListener('click', () => showView('import'));
+$$('[data-stk]').forEach(b => b.addEventListener('click', () => {
+  stKind = b.dataset.stk;
+  $$('[data-stk]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  renderStatements();
+}));
+$('#stPro').addEventListener('change', renderStatements);
+
+async function loadStatements() {
+  try {
+    stRows = await fetchAll(() => db().from('royalty_statements')
+      .select('id,pro,affiliate_no,period,period_start,period_end,income_type,source_file,total,imported_at,royalty_song_totals(count)')
+      .order('period_end', { ascending: false, nullsFirst: false }));
+    const pros = [...new Set(stRows.map(r => r.pro))];
+    const sel = $('#stPro'), cur = sel.value;
+    sel.innerHTML = '<option value="">All sources</option>' + pros.map(p => `<option value="${esc(p)}">${p === 'ME GUSTA' ? 'Me Gusta' : esc(p)}</option>`).join('');
+    sel.value = cur;
+    renderStatements();
+  } catch (e) { $('#stTable').innerHTML = `<div class="banner bad">Couldn’t load statements: ${esc(e.message)}</div>`; }
+}
+function renderStatements() {
+  const pro = $('#stPro').value;
+  const list = stRows.filter(r => (stKind === 'all' || stKindOf(r) === stKind) && (!pro || r.pro === pro))
+    .sort((a, b) => String(b.period_end || b.imported_at).localeCompare(String(a.period_end || a.imported_at)) || a.pro.localeCompare(b.pro));
+  const total = list.reduce((a, r) => a + Number(r.total || 0), 0);
+  const monthly = stRows.filter(r => stKindOf(r) === 'monthly').length;
+  $('#stSummary').textContent = `${stRows.length} statements (${monthly} monthly). Showing ${list.length}, totaling ${money(total)}.`;
+  if (!list.length) { $('#stTable').innerHTML = `<div class="empty">${stRows.length ? 'No statements match this filter.' : 'No statements imported yet.'}</div>`; return; }
+  $('#stTable').innerHTML = `
+    <div class="st-row head"><span>Statement</span><span class="hide-m">Source</span><span class="hide-m">Account</span><span class="hide-m">Type</span><span class="hide-m">Songs</span><span class="r">Total</span><span></span></div>
+    ${list.map(r => `
+    <div class="st-row">
+      <span style="min-width:0"><div class="t">${esc(r.period)}</div><div class="m">${esc(r.source_file || '')} · imported ${esc(new Date(r.imported_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}</div></span>
+      <span class="hide-m">${r.pro === 'ME GUSTA' ? 'Me Gusta' : esc(r.pro)}</span>
+      <span class="hide-m mono">${esc(r.affiliate_no)}</span>
+      <span class="hide-m">${esc(r.income_type)}</span>
+      <span class="hide-m mono">${r.royalty_song_totals?.[0]?.count ?? ''}</span>
+      <span class="r">${money(r.total)}</span>
+      <span class="st-actions"><button class="btn small" data-strename="${r.id}" aria-label="Rename ${esc(r.period)}">Rename</button><button class="btn small danger" data-stdel="${r.id}" aria-label="Delete ${esc(r.period)}">Delete</button></span>
+    </div>`).join('')}`;
+}
+$('#stTable').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.stdel) {
+    const r = stRows.find(x => x.id === b.dataset.stdel); if (!r) return;
+    if (!confirm(`Delete the ${r.pro === 'ME GUSTA' ? 'Me Gusta' : r.pro} statement “${r.period}” (${money(r.total)}, account ${r.affiliate_no})?\n\nIts per-song amounts are removed too, so those songs’ income totals go down. This can’t be undone, but you can import the file again.`)) return;
+    b.disabled = true;
+    const { error } = await db().from('royalty_statements').delete().eq('id', r.id);
+    if (error) { toast('Couldn’t delete: ' + error.message, true); b.disabled = false; return; }
+    toast(`Deleted “${r.period}” (${money(r.total)})`);
+    await loadAll(); renderCatalog(); loadStatements();
+  }
+  if (b.dataset.strename) {
+    const r = stRows.find(x => x.id === b.dataset.strename); if (!r) return;
+    const v = prompt('New name for this statement.\nUse the kind in brackets, like “2026 Q2 (quarterly)” or “May 2026 (monthly)”.', r.period);
+    if (v == null || !v.trim() || v.trim() === r.period) return;
+    const { error } = await db().from('royalty_statements').update({ period: v.trim() }).eq('id', r.id);
+    if (error) { toast(/duplicate key/i.test(error.message) ? 'A statement with that name already exists for this account.' : 'Couldn’t rename: ' + error.message, true); return; }
+    toast('Renamed'); loadStatements();
+  }
 });
 
 /* Warn before leaving with unsaved edits */
