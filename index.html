@@ -931,6 +931,12 @@ function monthDate(str, end) {
   return d.toISOString().slice(0, 10);
 }
 function longDate(str) { const d = new Date(String(str).trim() + ' UTC'); return isNaN(d) ? null : d.toISOString().slice(0, 10); }
+function monthLabel(iso) { return new Date(iso + 'T00:00:00Z').toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+// Every statement is labelled with its kind: "2026 Q2 (quarterly)" or "May 2026 (monthly)".
+function periodLabel(kind, startIso, endIso, fallback) {
+  if (kind === 'quarterly') return endIso ? `${quarterLabel(endIso)} (quarterly)` : (fallback ? `${fallback} (quarterly)` : '(quarterly)');
+  return startIso ? `${monthLabel(startIso)} (${kind})` : (fallback ? `${fallback} (${kind})` : `(${kind})`);
+}
 function quarterLabel(isoEnd) { if (!isoEnd) return ''; const [y, m] = isoEnd.split('-').map(Number); return `${y} Q${Math.ceil(m / 3)}`; }
 
 let stmt = null;
@@ -964,12 +970,10 @@ function readSesacCsv(text, fileName) {
   // Quarterly statements are labelled by quarter ("2026 Q2"). Any other kind (monthly, etc.) is labelled
   // by its own month and kind, so a monthly statement can never collide with a quarterly one.
   const startIso = ps ? monthDate(ps, false) : null;
-  let label = pr.length ? `${pr[1]} Q${pr[2]}` : '';
-  if (kind !== 'quarterly') {
-    label = startIso
-      ? `${new Date(startIso + 'T00:00:00Z').toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })} (${kind})`
-      : (pr.length ? `${pr[1]}/${pr[2]} (${kind})` : `(${kind})`);
-  }
+  const endIso = pe ? monthDate(pe, true) : (ps ? monthDate(ps, true) : null);
+  const label = kind === 'quarterly'
+    ? (pr.length ? `${pr[1]} Q${pr[2]} (quarterly)` : periodLabel(kind, startIso, endIso))
+    : periodLabel(kind, startIso, endIso, pr.length ? `${pr[1]}/${pr[2]}` : '');
   const hi = rows.findIndex(r => r.includes('Song #') && r.includes('Earnings'));
   if (hi < 0) throw new Error('Couldn’t find the column headers (Song #, Earnings) in this file.');
   const H = rows[hi]; const cNo = H.indexOf('Song #'), cTitle = H.indexOf('Song Title'), cShare = H.indexOf('%Shares'), cEarn = H.indexOf('Earnings');
@@ -987,7 +991,7 @@ function readSesacCsv(text, fileName) {
     period_start: startIso, period_end: pe ? monthDate(pe, true) : (ps ? monthDate(ps, true) : null),
     distribution_date: longDate(headerLine('Distribution Date').replace(/"/g, '')),
     income_type: 'Writer', createMissing: true,
-    rangeLabel: kind === 'quarterly' ? quarterLabel(pe ? monthDate(pe, true) : null) : '', rangeText: distPeriod,
+    rangeLabel: kind === 'quarterly' && endIso ? `${quarterLabel(endIso)} (quarterly)` : '', rangeText: distPeriod,
     parts: [{ affiliate: headerLine('Affiliate No'), label: headerLine('Affiliate Name'), works: list, lines, total: list.reduce((a, w) => a + w.amount, 0), include: true }]
   };
 }
@@ -1062,8 +1066,10 @@ async function readMeGustaPdf(file) {
   const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
   const { accounts, period } = parseMeGusta(await pdfLines(pdf));
   if (!accounts.length) throw new Error('No song income found in this PDF. The app reads Me Gusta Music royalty statements; other PDF layouts aren’t supported yet.');
+  const days = period ? (new Date(period.end) - new Date(period.start)) / 864e5 : 90;
+  const kind = days > 60 ? 'quarterly' : 'monthly';
   return {
-    file: file.name, pro: 'ME GUSTA', period: quarterLabel(period?.end),
+    file: file.name, pro: 'ME GUSTA', kind, period: periodLabel(kind, period?.start, period?.end),
     period_start: period?.start || null, period_end: period?.end || null, distribution_date: null,
     income_type: 'Publisher', createMissing: true,
     parts: accounts.map(a => ({ affiliate: a.affiliate, label: a.label, works: a.works, lines: a.lines, total: a.total, stated: a.stated, include: a.include, duplicateOf: a.duplicateOf || null }))
