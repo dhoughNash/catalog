@@ -958,8 +958,18 @@ function readSesacCsv(text, fileName) {
     throw new Error('This file isn’t a statement the app can read. Use a SESAC royalty statement CSV (first line starts “SESAC … Royalty Statement”) or a Me Gusta statement PDF.');
   }
   const headerLine = (label) => { const r = rows.slice(0, 8).find(r => r.join(',').toLowerCase().startsWith(label.toLowerCase())); return r ? r.join(',').split(':').slice(1).join(':').trim() : ''; };
-  const pr = first.match(/(\d{4})\s*\/\s*(\d)/) || [];
+  const pr = first.match(/(\d{4})\s*\/\s*(\d+)/) || [];
+  const kind = ((first.match(/SESAC\s+([A-Za-z]+)\s+Royalty/i) || [])[1] || 'quarterly').toLowerCase();
   const distPeriod = headerLine('Distribution Period'); const [ps, pe] = distPeriod.split('-');
+  // Quarterly statements are labelled by quarter ("2026 Q2"). Any other kind (monthly, etc.) is labelled
+  // by its own month and kind, so a monthly statement can never collide with a quarterly one.
+  const startIso = ps ? monthDate(ps, false) : null;
+  let label = pr.length ? `${pr[1]} Q${pr[2]}` : '';
+  if (kind !== 'quarterly') {
+    label = startIso
+      ? `${new Date(startIso + 'T00:00:00Z').toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })} (${kind})`
+      : (pr.length ? `${pr[1]}/${pr[2]} (${kind})` : `(${kind})`);
+  }
   const hi = rows.findIndex(r => r.includes('Song #') && r.includes('Earnings'));
   if (hi < 0) throw new Error('Couldn’t find the column headers (Song #, Earnings) in this file.');
   const H = rows[hi]; const cNo = H.indexOf('Song #'), cTitle = H.indexOf('Song Title'), cShare = H.indexOf('%Shares'), cEarn = H.indexOf('Earnings');
@@ -973,11 +983,11 @@ function readSesacCsv(text, fileName) {
   }
   const list = [...works.values()];
   return {
-    file: fileName, pro: 'SESAC', period: pr.length ? `${pr[1]} Q${pr[2]}` : '',
-    period_start: ps ? monthDate(ps, false) : null, period_end: pe ? monthDate(pe, true) : null,
+    file: fileName, pro: 'SESAC', period: label, kind,
+    period_start: startIso, period_end: pe ? monthDate(pe, true) : (ps ? monthDate(ps, true) : null),
     distribution_date: longDate(headerLine('Distribution Date').replace(/"/g, '')),
     income_type: 'Writer', createMissing: true,
-    rangeLabel: quarterLabel(pe ? monthDate(pe, true) : null), rangeText: distPeriod,
+    rangeLabel: kind === 'quarterly' ? quarterLabel(pe ? monthDate(pe, true) : null) : '', rangeText: distPeriod,
     parts: [{ affiliate: headerLine('Affiliate No'), label: headerLine('Affiliate Name'), works: list, lines, total: list.reduce((a, w) => a + w.amount, 0), include: true }]
   };
 }
@@ -1095,7 +1105,7 @@ function renderStatement() {
   const multi = s.parts.length > 1;
   $('#importResult').innerHTML = `
     <div class="facts">
-      <div class="fact"><span class="k">From</span><span class="v">${s.pro === 'ME GUSTA' ? 'Me Gusta Music' : esc(s.pro)}</span><span class="hint mono">${acctLine}</span></div>
+      <div class="fact"><span class="k">From</span><span class="v">${s.pro === 'ME GUSTA' ? 'Me Gusta Music' : esc(s.pro)}</span><span class="hint mono">${acctLine}${s.kind ? ' · ' + esc(s.kind) : ''}</span></div>
       <div class="fact"><label class="k" for="periodInput">Period (editable)</label><input class="input" id="periodInput" value="${esc(s.period || '')}" placeholder="2026 Q2" style="height:36px;font-weight:800"><span class="hint">${s.period_start && s.period_end ? esc(s.period_start + ' to ' + s.period_end) : ''}</span></div>
       <div class="fact"><span class="k">Importing</span><span class="v mono">${money(total)}</span><span class="hint">${works.length} songs</span></div>
       <div class="fact"><span class="k">Income type</span>
