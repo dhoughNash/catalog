@@ -977,6 +977,7 @@ function readSesacCsv(text, fileName) {
     period_start: ps ? monthDate(ps, false) : null, period_end: pe ? monthDate(pe, true) : null,
     distribution_date: longDate(headerLine('Distribution Date').replace(/"/g, '')),
     income_type: 'Writer', createMissing: true,
+    rangeLabel: quarterLabel(pe ? monthDate(pe, true) : null), rangeText: distPeriod,
     parts: [{ affiliate: headerLine('Affiliate No'), label: headerLine('Affiliate Name'), works: list, lines, total: list.reduce((a, w) => a + w.amount, 0), include: true }]
   };
 }
@@ -1077,9 +1078,10 @@ function matchPart(part) {
 
 async function checkDuplicates() {
   for (const p of stmt.parts) {
-    const { data } = await db().from('royalty_statements').select('id')
+    const { data } = await db().from('royalty_statements').select('id,period,source_file,imported_at,total')
       .eq('pro', stmt.pro).eq('affiliate_no', p.affiliate).eq('period', stmt.period).eq('income_type', stmt.income_type).limit(1);
-    p.already = !!(data && data.length);
+    p.alreadyRow = (data && data[0]) || null;
+    p.already = !!p.alreadyRow;
   }
 }
 
@@ -1094,7 +1096,7 @@ function renderStatement() {
   $('#importResult').innerHTML = `
     <div class="facts">
       <div class="fact"><span class="k">From</span><span class="v">${s.pro === 'ME GUSTA' ? 'Me Gusta Music' : esc(s.pro)}</span><span class="hint mono">${acctLine}</span></div>
-      <div class="fact"><span class="k">Period</span><span class="v">${esc(s.period || 'Unknown')}</span><span class="hint">${s.period_start && s.period_end ? esc(s.period_start + ' to ' + s.period_end) : ''}</span></div>
+      <div class="fact"><label class="k" for="periodInput">Period (editable)</label><input class="input" id="periodInput" value="${esc(s.period || '')}" placeholder="2026 Q2" style="height:36px;font-weight:800"><span class="hint">${s.period_start && s.period_end ? esc(s.period_start + ' to ' + s.period_end) : ''}</span></div>
       <div class="fact"><span class="k">Importing</span><span class="v mono">${money(total)}</span><span class="hint">${works.length} songs</span></div>
       <div class="fact"><span class="k">Income type</span>
         <div class="seg" role="group" aria-label="Income type">
@@ -1102,8 +1104,9 @@ function renderStatement() {
           <button data-itype="Publisher" aria-pressed="${s.income_type === 'Publisher'}">Publisher</button>
         </div></div>
     </div>
+    ${s.rangeLabel && s.period && s.rangeLabel !== s.period ? `<div class="banner info">The header numbers this statement ${esc(s.period)}, but its distribution period (${esc(s.rangeText)}) falls in ${esc(s.rangeLabel)}. Change the period above if that’s the one you want.</div>` : ''}
     ${s.parts.map((p, i) => `
-      ${p.already ? `<div class="banner warn">${esc(p.label || 'This statement')} (${esc(p.affiliate)}) for ${esc(s.period)} is already in your catalog as ${esc(s.income_type.toLowerCase())} income. It’s skipped so the income isn’t counted twice.</div>` : ''}
+      ${p.already ? `<div class="banner warn">A ${esc(s.pro === 'ME GUSTA' ? 'Me Gusta' : s.pro)} statement for <strong>${esc(s.period)}</strong> (${esc(s.income_type.toLowerCase())} income, account ${esc(p.affiliate)}) is already saved: imported ${esc(new Date(p.alreadyRow.imported_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} from ${esc(p.alreadyRow.source_file || 'a file')}, ${money(p.alreadyRow.total)}. This file is skipped so income isn’t counted twice. If this is a different statement, correct the period above and it will be checked again.</div>` : ''}
       ${p.duplicateOf ? `<div class="banner warn">Account ${esc(p.affiliate)} (${esc(p.label)}) repeats lines that are also in account ${esc(p.duplicateOf)}, amount for amount. It’s left out so that income isn’t counted twice. Ask your admin what this account is before including it.</div>` : ''}
       ${multi && !p.already ? `<label class="checkline"><input type="checkbox" data-part="${i}" ${p.include ? 'checked' : ''}> Import account ${esc(p.affiliate)}, ${esc(p.label)}: ${money(p.total)} from ${p.works.length} songs${p.stated != null && Math.abs(p.stated - p.total) > 0.02 ? ` <span class="pill warn">statement says ${money(p.stated)}</span>` : ''}</label>` : ''}
     `).join('')}
@@ -1125,12 +1128,18 @@ $('#importResult').addEventListener('click', async e => {
   if (b.id === 'stmtCancel') { stmt = null; $('#importResult').innerHTML = ''; }
   if (b.id === 'stmtGo') importStatement(b);
 });
-$('#importResult').addEventListener('change', e => {
+$('#importResult').addEventListener('change', async e => {
+  if (e.target.id === 'periodInput') {
+    stmt.period = e.target.value.trim();
+    if (!stmt.period) { toast('Enter a period like 2026 Q2.', true); return; }
+    await checkDuplicates(); renderStatement(); return;
+  }
   if (e.target.id === 'createMissing') stmt.createMissing = e.target.checked;
   if (e.target.dataset.part != null) { stmt.parts[+e.target.dataset.part].include = e.target.checked; renderStatement(); }
 });
 
 async function importStatement(btn) {
+  if (!stmt.period) { toast('Enter a period like 2026 Q2 first.', true); return; }
   btn.disabled = true; btn.textContent = 'Importing…';
   const s = stmt; let grand = 0, count = 0;
   try {
