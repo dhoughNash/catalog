@@ -1106,7 +1106,8 @@ function renderStatement() {
     </div>
     ${s.rangeLabel && s.period && s.rangeLabel !== s.period ? `<div class="banner info">The header numbers this statement ${esc(s.period)}, but its distribution period (${esc(s.rangeText)}) falls in ${esc(s.rangeLabel)}. Change the period above if that’s the one you want.</div>` : ''}
     ${s.parts.map((p, i) => `
-      ${p.already ? `<div class="banner warn">A ${esc(s.pro === 'ME GUSTA' ? 'Me Gusta' : s.pro)} statement for <strong>${esc(s.period)}</strong> (${esc(s.income_type.toLowerCase())} income, account ${esc(p.affiliate)}) is already saved: imported ${esc(new Date(p.alreadyRow.imported_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} from ${esc(p.alreadyRow.source_file || 'a file')}, ${money(p.alreadyRow.total)}. This file is skipped so income isn’t counted twice. If this is a different statement, correct the period above and it will be checked again.</div>` : ''}
+      ${p.already ? `<div class="banner warn">A ${esc(s.pro === 'ME GUSTA' ? 'Me Gusta' : s.pro)} statement for <strong>${esc(s.period)}</strong> (${esc(s.income_type.toLowerCase())} income, account ${esc(p.affiliate)}) is already saved: imported ${esc(new Date(p.alreadyRow.imported_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} from ${esc(p.alreadyRow.source_file || 'a file')}, ${money(p.alreadyRow.total)}. This file is skipped so income isn’t counted twice. If this is a different statement, correct the period above and it will be checked again.
+        <div style="margin-top:12px"><button class="btn small outline" data-replace="${i}">Replace the saved ${money(p.alreadyRow.total)} with this file’s ${money(p.total)}</button></div></div>` : ''}
       ${p.duplicateOf ? `<div class="banner warn">Account ${esc(p.affiliate)} (${esc(p.label)}) repeats lines that are also in account ${esc(p.duplicateOf)}, amount for amount. It’s left out so that income isn’t counted twice. Ask your admin what this account is before including it.</div>` : ''}
       ${multi && !p.already ? `<label class="checkline"><input type="checkbox" data-part="${i}" ${p.include ? 'checked' : ''}> Import account ${esc(p.affiliate)}, ${esc(p.label)}: ${money(p.total)} from ${p.works.length} songs${p.stated != null && Math.abs(p.stated - p.total) > 0.02 ? ` <span class="pill warn">statement says ${money(p.stated)}</span>` : ''}</label>` : ''}
     `).join('')}
@@ -1124,6 +1125,7 @@ function renderStatement() {
 }
 $('#importResult').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.replace != null) { await replaceSaved(+b.dataset.replace, b); return; }
   if (b.dataset.itype) { stmt.income_type = b.dataset.itype; await checkDuplicates(); renderStatement(); }
   if (b.id === 'stmtCancel') { stmt = null; $('#importResult').innerHTML = ''; }
   if (b.id === 'stmtGo') importStatement(b);
@@ -1137,6 +1139,20 @@ $('#importResult').addEventListener('change', async e => {
   if (e.target.id === 'createMissing') stmt.createMissing = e.target.checked;
   if (e.target.dataset.part != null) { stmt.parts[+e.target.dataset.part].include = e.target.checked; renderStatement(); }
 });
+
+// Swap a saved statement for the file on screen (a corrected or final version of the same period).
+async function replaceSaved(i, btn) {
+  const part = stmt.parts[i], old = part.alreadyRow; if (!old) return;
+  const ok = confirm(`Delete the saved ${stmt.pro} ${stmt.period} statement (${money(old.total)}, imported from ${old.source_file || 'a file'}) and its per-song amounts, so this file (${money(part.total)}) can be imported in its place?\n\nThe saved one will be gone; nothing else changes.`);
+  if (!ok) return;
+  btn.disabled = true;
+  const { error } = await db().from('royalty_statements').delete().eq('id', old.id);
+  if (error) { toast('Couldn’t remove the saved statement: ' + error.message, true); btn.disabled = false; return; }
+  await loadAll(); renderCatalog();
+  stmt.parts.forEach(matchPart);
+  await checkDuplicates(); renderStatement();
+  toast(`Removed the saved ${money(old.total)} statement. Ready to import.`);
+}
 
 async function importStatement(btn) {
   if (!stmt.period) { toast('Enter a period like 2026 Q2 first.', true); return; }
