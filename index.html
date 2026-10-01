@@ -1096,8 +1096,10 @@ function matchPart(part) {
 
 async function checkDuplicates() {
   for (const p of stmt.parts) {
-    const { data } = await db().from('royalty_statements').select('id,period,source_file,imported_at,total')
-      .eq('pro', stmt.pro).eq('affiliate_no', p.affiliate).eq('period', stmt.period).eq('income_type', stmt.income_type).limit(1);
+    // Same PRO + account + period is the same statement whatever the Writer/Publisher switch says,
+    // so flipping the switch can't be used to import a statement a second time.
+    const { data } = await db().from('royalty_statements').select('id,period,income_type,source_file,imported_at,total')
+      .eq('pro', stmt.pro).eq('affiliate_no', p.affiliate).eq('period', stmt.period).limit(1);
     p.alreadyRow = (data && data[0]) || null;
     p.already = !!p.alreadyRow;
   }
@@ -1124,7 +1126,7 @@ function renderStatement() {
     </div>
     ${s.rangeLabel && s.period && s.rangeLabel !== s.period ? `<div class="banner info">The header numbers this statement ${esc(s.period)}, but its distribution period (${esc(s.rangeText)}) falls in ${esc(s.rangeLabel)}. Change the period above if that’s the one you want.</div>` : ''}
     ${s.parts.map((p, i) => `
-      ${p.already ? `<div class="banner warn">A ${esc(s.pro === 'ME GUSTA' ? 'Me Gusta' : s.pro)} statement for <strong>${esc(s.period)}</strong> (${esc(s.income_type.toLowerCase())} income, account ${esc(p.affiliate)}) is already saved: imported ${esc(new Date(p.alreadyRow.imported_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} from ${esc(p.alreadyRow.source_file || 'a file')}, ${money(p.alreadyRow.total)}. This file is skipped so income isn’t counted twice. If this is a different statement, correct the period above and it will be checked again.
+      ${p.already ? `<div class="banner warn">A ${esc(s.pro === 'ME GUSTA' ? 'Me Gusta' : s.pro)} statement for <strong>${esc(s.period)}</strong> (${esc((p.alreadyRow.income_type || '').toLowerCase())} income, account ${esc(p.affiliate)}) is already saved: imported ${esc(new Date(p.alreadyRow.imported_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} from ${esc(p.alreadyRow.source_file || 'a file')}, ${money(p.alreadyRow.total)}. This file is skipped so income isn’t counted twice. If this is a different statement, correct the period above and it will be checked again.
         <div style="margin-top:12px"><button class="btn small outline" data-replace="${i}">Replace the saved ${money(p.alreadyRow.total)} with this file’s ${money(p.total)}</button></div></div>` : ''}
       ${p.duplicateOf ? `<div class="banner warn">Account ${esc(p.affiliate)} (${esc(p.label)}) repeats lines that are also in account ${esc(p.duplicateOf)}, amount for amount. It’s left out so that income isn’t counted twice. Ask your admin what this account is before including it.</div>` : ''}
       ${multi && !p.already ? `<label class="checkline"><input type="checkbox" data-part="${i}" ${p.include ? 'checked' : ''}> Import account ${esc(p.affiliate)}, ${esc(p.label)}: ${money(p.total)} from ${p.works.length} songs${p.stated != null && Math.abs(p.stated - p.total) > 0.02 ? ` <span class="pill warn">statement says ${money(p.stated)}</span>` : ''}</label>` : ''}
