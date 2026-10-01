@@ -965,15 +965,17 @@ function readSesacCsv(text, fileName) {
   }
   const headerLine = (label) => { const r = rows.slice(0, 8).find(r => r.join(',').toLowerCase().startsWith(label.toLowerCase())); return r ? r.join(',').split(':').slice(1).join(':').trim() : ''; };
   const pr = first.match(/(\d{4})\s*\/\s*(\d+)/) || [];
-  const kind = ((first.match(/SESAC\s+([A-Za-z]+)\s+Royalty/i) || [])[1] || 'quarterly').toLowerCase();
+  const headerKind = ((first.match(/SESAC\s+([A-Za-z]+)\s+Royalty/i) || [])[1] || 'quarterly').toLowerCase();
   const distPeriod = headerLine('Distribution Period'); const [ps, pe] = distPeriod.split('-');
   // Quarterly statements are labelled by quarter ("2026 Q2"). Any other kind (monthly, etc.) is labelled
   // by its own month and kind, so a monthly statement can never collide with a quarterly one.
   const startIso = ps ? monthDate(ps, false) : null;
   const endIso = pe ? monthDate(pe, true) : (ps ? monthDate(ps, true) : null);
-  const label = kind === 'quarterly'
-    ? (pr.length ? `${pr[1]} Q${pr[2]} (quarterly)` : periodLabel(kind, startIso, endIso))
-    : periodLabel(kind, startIso, endIso, pr.length ? `${pr[1]}/${pr[2]}` : '');
+  // The kind comes from how long the distribution period is: a three-month range is quarterly,
+  // a single month is monthly. The header word is only a fallback when there are no dates.
+  const spanDays = startIso && endIso ? (new Date(endIso) - new Date(startIso)) / 864e5 : null;
+  const kind = spanDays == null ? headerKind : (spanDays > 60 ? 'quarterly' : 'monthly');
+  const label = periodLabel(kind, startIso, endIso, pr.length ? (kind === 'quarterly' ? `${pr[1]} Q${pr[2]}` : `${pr[1]}/${pr[2]}`) : '');
   const hi = rows.findIndex(r => r.includes('Song #') && r.includes('Earnings'));
   if (hi < 0) throw new Error('Couldn’t find the column headers (Song #, Earnings) in this file.');
   const H = rows[hi]; const cNo = H.indexOf('Song #'), cTitle = H.indexOf('Song Title'), cShare = H.indexOf('%Shares'), cEarn = H.indexOf('Earnings');
@@ -991,7 +993,7 @@ function readSesacCsv(text, fileName) {
     period_start: startIso, period_end: pe ? monthDate(pe, true) : (ps ? monthDate(ps, true) : null),
     distribution_date: longDate(headerLine('Distribution Date').replace(/"/g, '')),
     income_type: 'Writer', createMissing: true,
-    rangeLabel: kind === 'quarterly' && endIso ? `${quarterLabel(endIso)} (quarterly)` : '', rangeText: distPeriod,
+    rangeLabel: '', rangeText: distPeriod,
     parts: [{ affiliate: headerLine('Affiliate No'), label: headerLine('Affiliate Name'), works: list, lines, total: list.reduce((a, w) => a + w.amount, 0), include: true }]
   };
 }
