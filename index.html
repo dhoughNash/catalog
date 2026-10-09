@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Catalog</title>
+<title>Back Catalog</title>
 <meta name="theme-color" content="#0C0A0E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -219,6 +219,45 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
   .party { grid-template-columns: minmax(0, 1fr) 80px 64px 36px; }
 }
 @media (max-width: 900px) and (prefers-reduced-motion: reduce) { #detail { transition: none; } }
+
+/* ---------- help ---------- */
+#help { position: fixed; inset: 0; z-index: 70; background: var(--ground); overflow-y: auto; }
+#help .help-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 16px; padding: calc(12px + env(safe-area-inset-top, 0px)) 28px 12px; background: var(--bar); border-bottom: 1px solid var(--line); }
+#help .help-bar .brand { font-size: 20px; }
+#help .help-body { max-width: 860px; margin: 0 auto; padding: 28px 28px 80px; line-height: 1.65; font-size: 15px; color: var(--text-2); }
+#help h1 { font-size: 40px; margin-bottom: 8px; color: var(--text); }
+#help h2 { margin: 44px 0 10px; font-size: 24px; font-weight: 800; font-stretch: 78%; letter-spacing: 0.01em; color: var(--text); scroll-margin-top: 80px; }
+#help h3 { margin: 22px 0 6px; font-size: 15px; color: var(--text); }
+#help p { margin: 0 0 12px; }
+#help ol, #help ul { margin: 0 0 14px; padding-left: 22px; }
+#help li { margin-bottom: 6px; }
+#help b, #help strong { color: var(--text); }
+#help .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; }
+#help .toc a { text-decoration: none; border: 1px solid var(--line-strong); border-radius: 18px; padding: 8px 14px; font-weight: 600; font-size: 13px; color: var(--text-2); }
+#help .toc a:hover { border-color: var(--amber); color: var(--text); }
+#help .shot { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 16px; margin: 14px 0 18px; }
+#help .shot .cap { font-size: 12px; color: var(--muted); margin-top: 12px; font-family: var(--mono); }
+#help .shot .mock-row { display: grid; grid-template-columns: minmax(0, 2.4fr) 0.9fr 0.8fr 0.9fr 1fr; gap: 10px; padding: 10px 6px; border-top: 1px solid var(--line-soft); align-items: center; }
+#help .shot .mock-row.head { border-top: 0; font-size: 12px; color: var(--muted); }
+#help .shot .mock-row .t { font-weight: 700; color: var(--text); }
+#help .shot .mock-row .m { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
+#help .shot .mock-row .r { text-align: right; font-family: var(--mono); font-weight: 600; color: var(--text); }
+#help .shot .mock-row.sel { background: var(--raised); border-radius: 8px; }
+#help .shot .chips { margin-bottom: 8px; }
+#help .shot .chip { cursor: default; min-height: 30px; font-size: 12px; }
+#help .shot .tabs-mock { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+#help .shot .tabs-mock span { padding: 10px 14px; border-radius: 8px; color: #B6AEAC; font-weight: 600; font-size: 13px; }
+#help .shot .tabs-mock span.on { background: var(--chip); color: var(--text); font-weight: 700; }
+#help .callout { border-left: 3px solid var(--amber); background: var(--panel); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 14px 0; }
+#help .help-foot { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); text-align: center; color: var(--text); font-size: 15px; }
+body.help-open { overflow: hidden; }
+@media (max-width: 900px) {
+  #help .help-bar { padding-left: 14px; padding-right: 14px; }
+  #help .help-body { padding: 20px 16px 60px; }
+  #help h1 { font-size: 32px; }
+  #help .shot .mock-row { grid-template-columns: minmax(0, 1fr) auto; }
+  #help .shot .mock-row .c { display: none; }
+}
 </style>
 </head>
 <body>
@@ -227,7 +266,7 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
 <div id="auth">
   <div class="box">
     <div class="brand-kicker">MASTER BUS</div>
-    <div class="brand">SONG LIKE THIS</div>
+    <div class="brand">BACK CATALOG</div>
     <label class="field"><span>Email</span><input class="input" type="email" id="authEmail" autocomplete="username"></label>
     <label class="field"><span>Password</span><input class="input" type="password" id="authPassword" autocomplete="current-password"></label>
     <button class="btn primary" id="authBtn">Sign in</button>
@@ -241,7 +280,7 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
   <header class="top">
     <div>
       <div class="brand-kicker">MASTER BUS</div>
-      <div class="brand">SONG LIKE THIS</div>
+      <div class="brand">BACK CATALOG</div>
     </div>
     <nav class="tabs" aria-label="Sections">
       <button data-view="catalog" aria-current="page">Catalog</button>
@@ -250,6 +289,7 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
       <button data-view="vault">Song Vault<span class="count" id="vaultCount"></span></button>
     </nav>
     <div class="spacer"></div>
+    <button class="btn" id="helpBtn" aria-haspopup="dialog">Help</button>
     <button class="btn primary" id="newSongBtn">New song</button>
     <button class="btn" id="signOutBtn">Sign out</button>
   </header>
@@ -342,6 +382,168 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
       <div id="vaultList"><div class="empty">Checking Song Vault…</div></div>
     </div>
   </section>
+</div>
+
+
+<!-- ======================= HELP ======================= -->
+<div id="help" class="hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="help-bar">
+    <div class="brand">BACK CATALOG · HELP</div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="helpClose">Back to catalog</button>
+  </div>
+  <div class="help-body" id="helpBody" tabindex="-1">
+    <h1 id="helpTitle">How Back Catalog works</h1>
+    <p>Back Catalog is your master song catalog. It keeps every song in one place with its writers, publishers and shares, tags each song so you can see which artists it suits, and adds up the royalty income each song has earned. This page walks you through it from the start.</p>
+    <div class="toc" aria-label="Help sections">
+      <a href="#h-start">Getting started</a>
+      <a href="#h-around">Finding your way around</a>
+      <a href="#h-catalog">The Catalog</a>
+      <a href="#h-add">Adding a song</a>
+      <a href="#h-song">The song panel</a>
+      <a href="#h-tags">Tags and best fits</a>
+      <a href="#h-statements">Importing statements</a>
+      <a href="#h-list">The Statements tab</a>
+      <a href="#h-vault">Song Vault</a>
+      <a href="#h-tips">Tips and questions</a>
+    </div>
+
+    <h2 id="h-start">Getting started</h2>
+    <ol>
+      <li>Open the app and sign in with your email and password. It is the same account you use for Song Vault and Pitch Log.</li>
+      <li>You land on the <b>Catalog</b> tab, which lists all your songs.</li>
+      <li>Click any song to open its details on the right (on a phone, the details slide in over the list).</li>
+      <li>Click <b>Help</b> at the top any time to come back to this page, and <b>Back to catalog</b> when you are done.</li>
+    </ol>
+
+    <h2 id="h-around">Finding your way around</h2>
+    <p>The bar across the top has four tabs, plus the Help, New song and Sign out buttons.</p>
+    <div class="shot">
+      <div class="tabs-mock"><span class="on">Catalog</span><span>Statements</span><span>Import statement</span><span>Song Vault <b style="color:var(--amber);font-family:var(--mono)">2</b></span></div>
+      <div class="cap">The top tabs. The number next to Song Vault is how many new songs are waiting there.</div>
+    </div>
+    <ul>
+      <li><b>Catalog</b>: your songs. Search, filter, open and edit them.</li>
+      <li><b>Statements</b>: the list of royalty statements you have imported.</li>
+      <li><b>Import statement</b>: bring in a new royalty statement so each song's income updates.</li>
+      <li><b>Song Vault</b>: new co-writes from Song Vault that are not in your catalog yet.</li>
+      <li><b>New song</b>: add a song by hand.</li>
+    </ul>
+
+    <h2 id="h-catalog">The Catalog</h2>
+    <p>Each row is one song, showing its title, status, vocal, tempo and the total income it has earned. The small grey line under the title shows its tags, or its work numbers if it has no tags yet. The big number at the top right is your lifetime income across the whole catalog.</p>
+    <div class="shot">
+      <div class="mock-row head"><span>Title</span><span class="c">Status</span><span class="c">Vocal</span><span class="c">Tempo</span><span class="r">Total income</span></div>
+      <div class="mock-row sel"><span><div class="t">Example Song One</div><div class="m">Country Pop · Love · Hopeful</div></span><span class="c">Available</span><span class="c">Male</span><span class="c">Mid-tempo</span><span class="r">$1,250.00</span></div>
+      <div class="mock-row"><span><div class="t">Example Song Two</div><div class="m">SESAC 1234567 · your share 50%</div></span><span class="c">On hold</span><span class="c">—</span><span class="c">—</span><span class="r">$310.40</span></div>
+      <div class="cap">Example rows (made-up songs). The highlighted row is the song that is open.</div>
+    </div>
+    <h3>Finding songs</h3>
+    <ul>
+      <li><b>Search box</b>: type a title, writer, publisher, tag, a "sounds like" artist, or a work number.</li>
+      <li><b>All / Tagged / Untagged</b>: handy for finding songs you have not tagged yet.</li>
+      <li><b>Status</b>: show only Available, On hold, Cut or Released songs.</li>
+      <li><b>Sort</b>: most income, title A–Z, or newest registered.</li>
+      <li><b>Filter by tags</b>: opens a panel of tag buttons (see below).</li>
+    </ul>
+    <h3>Filtering by tags</h3>
+    <p>Click <b>Filter by tags</b>, then click the tags you want. Picking several tags in the same group means "any of these". Picking tags from different groups means "all of these". For example, <b>Female</b> vocal plus <b>Ballad</b> or <b>Slow</b> tempo shows songs that are female-vocal and either ballad or slow. Your choices show as small buttons under the search bar; click one to remove it, or click <b>Clear</b>.</p>
+    <div class="shot">
+      <div class="chips"><span class="chip" aria-hidden="true">Male</span><span class="chip" aria-hidden="true" style="background:var(--amber);border-color:var(--amber);color:var(--ground)">Female</span><span class="chip" aria-hidden="true">Duet</span></div>
+      <div class="chips"><span class="chip" aria-hidden="true" style="background:var(--amber);border-color:var(--amber);color:var(--ground)">Ballad</span><span class="chip" aria-hidden="true" style="background:var(--amber);border-color:var(--amber);color:var(--ground)">Slow</span><span class="chip" aria-hidden="true">Up-tempo</span></div>
+      <div class="cap">Highlighted buttons are selected. Different groups combine as "and"; within a group it is "or".</div>
+    </div>
+
+    <h2 id="h-add">Adding a song</h2>
+    <ol>
+      <li>Click <b>New song</b> at the top.</li>
+      <li>Type the title, then fill in whatever you know. Only the title is needed to start.</li>
+      <li>Add writers and publishers with their shares (see "The song panel").</li>
+      <li>Click <b>Add to catalog</b> at the bottom of the panel.</li>
+    </ol>
+    <p>Songs that come from co-writers in Song Vault are added from the <b>Song Vault</b> tab instead, which copies their writers, publishers and splits for you.</p>
+
+    <h2 id="h-song">The song panel</h2>
+    <p>Clicking a song opens a panel with everything about it. Change anything you like, then click <b>Save changes</b> at the bottom. A status next to the button tells you whether you have unsaved changes. Close the panel with the <b>×</b> button or the Esc key; if you have unsaved edits, you will be asked first.</p>
+    <div class="shot">
+      <div style="font-size:24px;font-weight:800;font-stretch:74%;color:var(--text)">Example Song One</div>
+      <div class="hint mono" style="margin:4px 0 12px">Registered 2024-03-12 · Your share 50%</div>
+      <div class="card" style="margin-bottom:12px"><h3>Total income <span class="aside">Last paid 2026 Q2</span></h3><div class="big-money">$1,250.00</div></div>
+      <div class="card" style="margin-bottom:0"><h3>Best fits <span class="aside">From your Pitch Log artist sheets</span></h3>
+        <div class="fit"><div><b style="color:var(--text)">Example Artist A</b><div class="why">female vocal · ballad · love</div></div><div class="bar"><span style="width:84%"></span></div><span class="mono">84</span></div>
+        <div class="fit"><div><b style="color:var(--text)">Example Artist B</b><div class="why">mid-tempo · hopeful</div></div><div class="bar"><span style="width:61%"></span></div><span class="mono">61</span></div>
+      </div>
+      <div class="cap">Part of a song panel (example data).</div>
+    </div>
+    <h3>What is in the panel</h3>
+    <ul>
+      <li><b>Total income</b>: everything this song has earned across your imported statements. Click <b>Statements</b> inside the card to see which statements it came from.</li>
+      <li><b>Song details</b>: status, your share of the song, BPM, key, alternate title, ISWC and a link to the demo.</li>
+      <li><b>Tags</b>: the buttons that describe the song (more below).</li>
+      <li><b>Rights</b>: the writers and publishers, each with a PRO (SESAC, BMI, ASCAP and so on) and a share. The line underneath adds them up. <b>It should total 100%</b>, and turns red if it does not. Work numbers from your PROs show here too.</li>
+      <li><b>Best fits</b>: artists this song matches, once the song is tagged.</li>
+      <li><b>Notes</b>: anything you want to remember.</li>
+    </ul>
+    <h3>Adding writers and publishers</h3>
+    <p>Click <b>Add writer</b> or <b>Add publisher</b>, type the name, choose the PRO, and enter the share as a percent of the <i>whole song</i>. Use the <b>×</b> on the right to remove a row.</p>
+    <h3>Deleting a song</h3>
+    <p>Use the red <b>Delete</b> button at the bottom of a saved song. You will be asked to confirm.</p>
+
+    <h2 id="h-tags">Tags and best fits</h2>
+    <p>Tags are how the app works out which artists a song might suit. In the song panel, click a tag to turn it on (it turns coral) and click it again to turn it off.</p>
+    <ul>
+      <li><b>Vocal</b>, <b>Tempo feel</b>, <b>Demo level</b> and <b>Point of view</b>: pick one.</li>
+      <li><b>Sub-genre</b>, <b>Topics</b> and <b>Mood</b>: pick as many as fit.</li>
+      <li><b>+ New</b>: the dashed button at the end of a group adds a tag that is not on the list yet.</li>
+      <li><b>Sounds like</b>: type artists or songs, separated by commas.</li>
+      <li><b>Sync-ready</b> and <b>I own the master</b>: switch these to Yes when they are true.</li>
+    </ul>
+    <div class="callout">The <b>Best fits</b> list needs at least a vocal, tempo, sub-genre or topic tag on the song. The more you tag, the better the matches. Untagged songs show a reminder instead.</div>
+
+    <h2 id="h-statements">Importing royalty statements</h2>
+    <p>Importing a statement adds up what each song earned so the income numbers stay current. You can import a <b>SESAC statement (CSV file)</b> or a <b>Me Gusta Music statement (PDF file)</b>.</p>
+    <ol>
+      <li>Open the <b>Import statement</b> tab.</li>
+      <li>Click the box to choose your file, or drag the file onto it.</li>
+      <li>Read the preview. It shows the total, how many songs matched your catalog, and how many did not.</li>
+      <li>Tick <b>Add the unmatched songs to the catalog</b> if you want songs that are not in your catalog yet created for you.</li>
+      <li>Click the <b>Import</b> button, which shows the total amount.</li>
+    </ol>
+    <p>Where the statement lets you choose who the income belongs to (for example Writer or Publisher), pick the right one in the preview before you import.</p>
+    <h3>Things you might see</h3>
+    <ul>
+      <li><b>Already imported</b>: if a statement was imported before, the preview says so. You can choose to replace the saved amount with the new file's amount, which is useful if a corrected statement arrives.</li>
+      <li><b>Account left out</b>: if one account repeats the same lines as another account, it is skipped so income is not counted twice.</li>
+      <li><b>Different totals</b>: if the total the app calculated differs from what the statement says, you will see a note. Check the file before importing.</li>
+    </ul>
+    <p>Income is recorded exactly as the statement shows it. Any admin fee Me Gusta takes is not adjusted for.</p>
+
+    <h2 id="h-list">The Statements tab</h2>
+    <p>This is the history of everything you have imported. Filter by <b>Quarterly</b> or <b>Monthly</b>, or by source. Each row has <b>Rename</b> (to change how the period is labelled) and <b>Delete</b> (which removes that statement's income from your songs, so use it with care).</p>
+
+    <h2 id="h-vault">Song Vault</h2>
+    <p>Song Vault is where new co-writes from other writers arrive. This tab shows the ones that are not in your catalog yet.</p>
+    <ul>
+      <li><b>Add as new song</b>: copies the song, its writers, publishers and splits into your catalog.</li>
+      <li><b>Link to existing</b>: appears when a song with the same title is already in your catalog. It connects the two instead of making a duplicate.</li>
+      <li><b>Add all</b>: adds everything waiting in one click.</li>
+    </ul>
+    <p>When nothing is waiting, the tab tells you everything is already in your catalog.</p>
+
+    <h2 id="h-tips">Tips and questions</h2>
+    <h3>My changes did not stick.</h3>
+    <p>Edits are only kept after you click <b>Save changes</b>. The status beside the button shows when you have unsaved changes.</p>
+    <h3>A song is missing from the list.</h3>
+    <p>Check whether a search, status, tag filter or "Tagged/Untagged" choice is hiding it. The line under the Catalog title says how many songs are showing out of the total.</p>
+    <h3>The income looks too low or too high.</h3>
+    <p>Open the song and look at its statements list under Total income. If a statement was imported twice or is missing, fix it in the Statements tab.</p>
+    <h3>Can I use it on my phone?</h3>
+    <p>Yes. On a small screen the song panel opens over the list; use the <b>×</b> to go back.</p>
+    <h3>How do I sign out?</h3>
+    <p>Click <b>Sign out</b> at the top right.</p>
+
+    <div class="help-foot">For further assistance, please contact <a href="mailto:MasterBusMDM@gmail.com">MasterBusMDM@gmail.com</a>.</div>
+  </div>
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -1415,6 +1617,25 @@ $('#stTable').addEventListener('click', async e => {
 
 /* Warn before leaving with unsaved edits */
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* Help */
+(function () {
+  const help = document.getElementById('help'), btn = document.getElementById('helpBtn');
+  let opener = null;
+  function openHelp() { opener = btn; help.classList.remove('hidden'); document.body.classList.add('help-open'); help.scrollTop = 0; document.getElementById('helpBody').focus({ preventScroll: true }); }
+  function closeHelp() { help.classList.add('hidden'); document.body.classList.remove('help-open'); if (opener) opener.focus(); }
+  btn.addEventListener('click', openHelp);
+  document.getElementById('helpClose').addEventListener('click', closeHelp);
+  help.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#h-"]'); if (!a) return;
+    e.preventDefault();
+    const t = document.getElementById(a.getAttribute('href').slice(1));
+    if (t) t.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !help.classList.contains('hidden')) { e.stopImmediatePropagation(); closeHelp(); }
+  }, true);
+})();
 </script>
 </body>
 </html>
