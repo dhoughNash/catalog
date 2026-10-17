@@ -61,6 +61,8 @@ header.top { flex-shrink: 0; position: relative; z-index: 20; border-bottom: 1px
 .menu button { width: 100%; height: 44px; display: flex; align-items: center; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font-weight: 600; text-align: left; cursor: pointer; }
 .menu button:hover, .menu button:focus-visible { background: var(--chip); color: var(--text); }
 .menu button.danger { color: var(--red); }
+.menu .count { font-family: var(--mono); font-size: 12px; color: var(--amber); margin-left: auto; }
+.dot { width: 8px; height: 8px; border-radius: 4px; background: var(--ground); margin-left: 2px; }
 .menu .sep { height: 1px; background: var(--line); margin: 6px 0; }
 .menu .who { padding: 8px 12px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .menu .who .k { font-size: 12px; color: var(--muted); }
@@ -83,9 +85,11 @@ nav.tabs .count { font-family: var(--mono); font-size: 12px; color: var(--amber)
 .list-head-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
 h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spacing: 0.01em; line-height: 1; }
 .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
-.lifetime { text-align: right; }
+.lifetime { text-align: right; min-height: 44px; padding: 6px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: transparent; color: var(--text); cursor: pointer; }
+.lifetime:hover, .lifetime[aria-pressed="true"] { border-color: var(--amber); }
 .lifetime .label { font-size: 12px; color: var(--muted); }
 .lifetime .num { font-family: var(--mono); font-size: 28px; font-weight: 600; }
+.lifetime[aria-pressed="false"] .num { color: var(--muted); letter-spacing: 0.08em; }
 .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .controls .input { width: auto; }
 .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
@@ -304,10 +308,11 @@ body.help-open { overflow: hidden; }
       </div>
       <div class="top-actions">
         <div class="menu-wrap">
-          <button class="btn primary" id="addBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu">Add <span class="chev-d" aria-hidden="true"></span></button>
+          <button class="btn primary" id="addBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu">Add <span class="chev-d" aria-hidden="true"></span><span class="dot hidden" id="vaultDot" aria-hidden="true"></span></button>
           <div class="menu hidden" id="addMenu" role="menu" aria-label="Add">
             <button role="menuitem" id="newSongBtn">New song</button>
             <button role="menuitem" id="menuImport">Import statement</button>
+            <button role="menuitem" id="menuVault">Song Vault<span class="count" id="vaultCount"></span></button>
           </div>
         </div>
         <div class="menu-wrap">
@@ -322,9 +327,8 @@ body.help-open { overflow: hidden; }
         </div>
       </div>
     </div>
-    <nav class="tabs" aria-label="Sections">
-      <button data-view="catalog" aria-current="page">Catalog</button>
-      <button data-view="vault">Song Vault<span class="count" id="vaultCount"></span></button>
+    <nav class="tabs hidden" id="backNav" aria-label="Back">
+      <button data-view="catalog">&larr; Back to catalog</button>
     </nav>
   </header>
 
@@ -337,10 +341,10 @@ body.help-open { overflow: hidden; }
             <h1>Catalog</h1>
             <div class="sub" id="catSummary">Loading your catalog…</div>
           </div>
-          <div class="lifetime">
+          <button class="lifetime" id="lifetimeBtn" aria-pressed="false" aria-label="Lifetime income, hidden. Press to show.">
             <div class="label">Lifetime income</div>
-            <div class="num" id="lifetime">$0.00</div>
-          </div>
+            <div class="num" id="lifetime">$••••••</div>
+          </button>
         </div>
         <div class="controls">
           <div class="seg" role="group" aria-label="Tagging">
@@ -444,28 +448,22 @@ body.help-open { overflow: hidden; }
     <h2 id="h-start">Getting started</h2>
     <ol>
       <li>Open the app and sign in with your email and password. It is the same account you use for Song Vault and Pitch Log.</li>
-      <li>You land on the <b>Catalog</b> tab, which lists all your songs.</li>
+      <li>You land on the <b>Catalog</b>, which lists all your songs.</li>
       <li>Click any song to open its details on the right (on a phone, the details slide in over the list).</li>
       <li>Open the round account button at the top right and choose <b>Help &amp; how-to guide</b> any time to come back to this page. Click <b>Back to catalog</b> when you are done.</li>
     </ol>
 
     <h2 id="h-around">Finding your way around</h2>
-    <p>The bar across the top has the search box in the middle, an <b>Add</b> menu and your <b>account</b> button on the right, and two tabs underneath.</p>
-    <div class="shot">
-      <div class="tabs-mock"><span class="on">Catalog</span><span>Song Vault <b style="color:var(--amber);font-family:var(--mono)">2</b></span></div>
-      <div class="cap">The top tabs. The number next to Song Vault is how many new songs are waiting there.</div>
-    </div>
+    <p>The bar across the top has the search box in the middle, and an <b>Add</b> menu and your <b>account</b> button on the right. When you are on another screen, a <b>Back to catalog</b> link appears under the bar.</p>
     <ul>
       <li><b>Catalog</b>: your songs. Search, filter, open and edit them.</li>
-      <li><b>Catalog</b> tab: your songs. Search, filter, open and edit them.</li>
-      <li><b>Song Vault</b> tab: new co-writes from Song Vault that are not in your catalog yet.</li>
       <li><b>Search box</b>: type a title, writer, tag or work number from any screen to find songs.</li>
-      <li><b>Add</b> menu: <b>New song</b> (add one by hand) and <b>Import statement</b> (bring in a royalty statement so each song's income updates).</li>
+      <li><b>Add</b> menu: <b>New song</b> (add one by hand), <b>Import statement</b> (bring in a royalty statement so each song's income updates), and <b>Song Vault</b> (new co-writes waiting to be added; a small dot on the Add button means some are waiting).</li>
       <li><b>Account button</b> (your initial): <b>View Statements</b> (the list of statements you have imported), <b>Help &amp; how-to guide</b>, and <b>Sign out</b>.</li>
     </ul>
 
     <h2 id="h-catalog">The Catalog</h2>
-    <p>Each row is one song, showing its title, status, vocal, tempo and the total income it has earned. The small grey line under the title shows its tags, or its work numbers if it has no tags yet. The big number at the top right is your lifetime income across the whole catalog.</p>
+    <p>Each row is one song, showing its title, status, vocal, tempo and the total income it has earned. The small grey line under the title shows its tags, or its work numbers if it has no tags yet. The <b>Lifetime income</b> button at the top right adds up everything the catalog has earned. The amount is hidden until you press the button; press it again to hide it.</p>
     <div class="shot">
       <div class="mock-row head"><span>Title</span><span class="c">Status</span><span class="c">Vocal</span><span class="c">Tempo</span><span class="r">Total income</span></div>
       <div class="mock-row sel"><span><div class="t">Example Song One</div><div class="m">Country Pop · Love · Hopeful</div></span><span class="c">Available</span><span class="c">Male</span><span class="c">Mid-tempo</span><span class="r">$1,250.00</span></div>
@@ -495,7 +493,7 @@ body.help-open { overflow: hidden; }
       <li>Add writers and publishers with their shares (see "The song panel").</li>
       <li>Click <b>Add to catalog</b> at the bottom of the panel.</li>
     </ol>
-    <p>Songs that come from co-writers in Song Vault are added from the <b>Song Vault</b> tab instead, which copies their writers, publishers and splits for you.</p>
+    <p>Songs that come from co-writers in Song Vault are added from <b>Add</b> › <b>Song Vault</b> instead, which copies their writers, publishers and splits for you.</p>
 
     <h2 id="h-song">The song panel</h2>
     <p>Clicking a song opens a panel with everything about it. Change anything you like, then click <b>Save changes</b> at the bottom. A status next to the button tells you whether you have unsaved changes. Close the panel with the <b>×</b> button or the Esc key; if you have unsaved edits, you will be asked first.</p>
@@ -556,13 +554,13 @@ body.help-open { overflow: hidden; }
     <p>Open the account button and choose <b>View Statements</b>. This is the history of everything you have imported. Filter by <b>Quarterly</b> or <b>Monthly</b>, or by source. Each row has <b>Rename</b> (to change how the period is labelled) and <b>Delete</b> (which removes that statement's income from your songs, so use it with care).</p>
 
     <h2 id="h-vault">Song Vault</h2>
-    <p>Song Vault is where new co-writes from other writers arrive. This tab shows the ones that are not in your catalog yet.</p>
+    <p>Song Vault is where new co-writes from other writers arrive. Open it from <b>Add</b> › <b>Song Vault</b> to see the ones that are not in your catalog yet.</p>
     <ul>
       <li><b>Add as new song</b>: copies the song, its writers, publishers and splits into your catalog.</li>
       <li><b>Link to existing</b>: appears when a song with the same title is already in your catalog. It connects the two instead of making a duplicate.</li>
       <li><b>Add all</b>: adds everything waiting in one click.</li>
     </ul>
-    <p>When nothing is waiting, the tab tells you everything is already in your catalog.</p>
+    <p>When nothing is waiting, the screen tells you everything is already in your catalog.</p>
 
     <h2 id="h-tips">Tips and questions</h2>
     <h3>My changes did not stick.</h3>
@@ -709,9 +707,17 @@ $$('[data-tagf]').forEach(b => b.addEventListener('click', () => {
   renderRows();
 }));
 
+let lifetimeTotal = 0, lifetimeShown = false;
+function paintLifetime() {
+  $('#lifetime').textContent = lifetimeShown ? money(lifetimeTotal) : '$••••••';
+  const b = $('#lifetimeBtn');
+  b.setAttribute('aria-pressed', String(lifetimeShown));
+  b.setAttribute('aria-label', lifetimeShown ? `Lifetime income, ${money(lifetimeTotal)}. Press to hide.` : 'Lifetime income, hidden. Press to show.');
+}
+$('#lifetimeBtn').addEventListener('click', () => { lifetimeShown = !lifetimeShown; paintLifetime(); });
 function renderCatalog() {
-  const total = [...incomeBySong.values()].reduce((a, r) => a + r.total, 0);
-  $('#lifetime').textContent = money(total);
+  lifetimeTotal = [...incomeBySong.values()].reduce((a, r) => a + r.total, 0);
+  paintLifetime();
   renderRows();
 }
 
@@ -1165,6 +1171,7 @@ $$('nav.tabs button').forEach(b => b.addEventListener('click', () => showView(b.
 function showView(v) {
   $$('nav.tabs button').forEach(b => { if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   ['catalog', 'import', 'statements', 'vault'].forEach(x => $('#view-' + x).classList.toggle('hidden', x !== v));
+  $('#backNav').classList.toggle('hidden', v === 'catalog');
   if (v === 'vault') checkVault();
   if (v === 'statements') loadStatements();
 }
@@ -1525,6 +1532,7 @@ async function checkVault() {
     const linked = new Set(songs.map(s => s.song_vault_id).filter(Boolean));
     vaultPending = vs.filter(v => !linked.has(v.id));
     $('#vaultCount').textContent = vaultPending.length ? String(vaultPending.length) : '';
+    $('#vaultDot').classList.toggle('hidden', !vaultPending.length);
     if (!vaultPending.length) { el.innerHTML = '<div class="empty">Everything in Song Vault is already in your catalog.</div>'; return; }
     const byTitle = new Map(); songs.forEach(s => { byTitle.set(norm(s.title), s); if (s.alt_title) byTitle.set(norm(s.alt_title), s); });
     el.innerHTML = `
@@ -1694,6 +1702,7 @@ window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); 
     closeAll(); e.stopImmediatePropagation(); $('#' + btn).focus();
   }, true);
   $('#menuImport').addEventListener('click', () => showView('import'));
+  $('#menuVault').addEventListener('click', () => showView('vault'));
   $('#menuStatements').addEventListener('click', () => showView('statements'));
   $('#search').addEventListener('input', () => { if ($('#view-catalog').classList.contains('hidden')) showView('catalog'); });
 })();
