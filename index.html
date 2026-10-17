@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>BackCat</title>
+<title>Back.Cat</title>
 <meta name="theme-color" content="#0C0A0E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -285,7 +285,7 @@ body.help-open { overflow: hidden; }
 <div id="auth">
   <div class="box">
     <div class="brand-kicker">MASTER BUS</div>
-    <div class="brand">BACKCAT</div>
+    <div class="brand">BACK.CAT</div>
     <label class="field"><span>Email</span><input class="input" type="email" id="authEmail" autocomplete="username"></label>
     <label class="field"><span>Password</span><input class="input" type="password" id="authPassword" autocomplete="current-password"></label>
     <button class="btn primary" id="authBtn">Sign in</button>
@@ -298,7 +298,7 @@ body.help-open { overflow: hidden; }
 <div class="app hidden" id="app">
   <header class="top">
     <div class="top-row">
-      <div class="brand">BACKCAT</div>
+      <div class="brand">BACK.CAT</div>
       <div class="top-search-wrap">
         <input class="input top-search" id="search" type="search" placeholder="Search title, writer, tag, or work #" aria-label="Search songs">
       </div>
@@ -308,7 +308,6 @@ body.help-open { overflow: hidden; }
           <div class="menu hidden" id="addMenu" role="menu" aria-label="Add">
             <button role="menuitem" id="newSongBtn">New song</button>
             <button role="menuitem" id="menuImport">Import statement</button>
-            <button role="menuitem" id="menuVault">From Song Vault</button>
           </div>
         </div>
         <div class="menu-wrap">
@@ -422,13 +421,13 @@ body.help-open { overflow: hidden; }
 <!-- ======================= HELP ======================= -->
 <div id="help" class="hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
   <div class="help-bar">
-    <div class="brand">BACKCAT · HELP</div>
+    <div class="brand">BACK.CAT · HELP</div>
     <div class="spacer"></div>
     <button class="btn primary" id="helpClose">Back to catalog</button>
   </div>
   <div class="help-body" id="helpBody" tabindex="-1">
-    <h1 id="helpTitle">How BackCat works</h1>
-    <p>BackCat is your master song catalog. It keeps every song in one place with its writers, publishers and shares, tags each song so you can see which artists it suits, and adds up the royalty income each song has earned. This page walks you through it from the start.</p>
+    <h1 id="helpTitle">How Back.Cat works</h1>
+    <p>Back.Cat is your master song catalog. It keeps every song in one place with its writers, publishers and shares, tags each song so you can see which artists it suits, and adds up the royalty income each song has earned. This page walks you through it from the start.</p>
     <div class="toc" aria-label="Help sections">
       <a href="#h-start">Getting started</a>
       <a href="#h-around">Finding your way around</a>
@@ -461,7 +460,7 @@ body.help-open { overflow: hidden; }
       <li><b>Catalog</b> tab: your songs. Search, filter, open and edit them.</li>
       <li><b>Song Vault</b> tab: new co-writes from Song Vault that are not in your catalog yet.</li>
       <li><b>Search box</b>: type a title, writer, tag or work number from any screen to find songs.</li>
-      <li><b>Add</b> menu: <b>New song</b> (add one by hand), <b>Import statement</b> (bring in a royalty statement so each song's income updates), and <b>From Song Vault</b>.</li>
+      <li><b>Add</b> menu: <b>New song</b> (add one by hand) and <b>Import statement</b> (bring in a royalty statement so each song's income updates).</li>
       <li><b>Account button</b> (your initial): <b>View Statements</b> (the list of statements you have imported), <b>Help &amp; how-to guide</b>, and <b>Sign out</b>.</li>
     </ul>
 
@@ -496,7 +495,7 @@ body.help-open { overflow: hidden; }
       <li>Add writers and publishers with their shares (see "The song panel").</li>
       <li>Click <b>Add to catalog</b> at the bottom of the panel.</li>
     </ol>
-    <p>Songs that come from co-writers in Song Vault are added from the <b>Song Vault</b> tab (or <b>Add</b> › <b>From Song Vault</b>) instead, which copies their writers, publishers and splits for you.</p>
+    <p>Songs that come from co-writers in Song Vault are added from the <b>Song Vault</b> tab instead, which copies their writers, publishers and splits for you.</p>
 
     <h2 id="h-song">The song panel</h2>
     <p>Clicking a song opens a panel with everything about it. Change anything you like, then click <b>Save changes</b> at the bottom. A status next to the button tells you whether you have unsaved changes. Close the panel with the <b>×</b> button or the Esc key; if you have unsaved edits, you will be asked first.</p>
@@ -1695,7 +1694,6 @@ window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); 
     closeAll(); e.stopImmediatePropagation(); $('#' + btn).focus();
   }, true);
   $('#menuImport').addEventListener('click', () => showView('import'));
-  $('#menuVault').addEventListener('click', () => showView('vault'));
   $('#menuStatements').addEventListener('click', () => showView('statements'));
   $('#search').addEventListener('input', () => { if ($('#view-catalog').classList.contains('hidden')) showView('catalog'); });
 })();
