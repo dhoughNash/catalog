@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Back Catalog</title>
+<title>BackCat</title>
 <meta name="theme-color" content="#0C0A0E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -51,10 +51,27 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 
 /* ---------- shell ---------- */
 .app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
-header.top { flex-shrink: 0; display: flex; align-items: center; gap: 28px; padding: 0 28px; height: 72px; border-bottom: 1px solid var(--line); background: var(--bar); padding-top: env(safe-area-inset-top, 0px); }
-nav.tabs { display: flex; gap: 4px; }
-nav.tabs button { height: 44px; padding: 0 16px; border-radius: 8px; border: 0; background: transparent; color: #B6AEAC; font-weight: 600; cursor: pointer; }
-nav.tabs button[aria-current="page"] { background: var(--chip); color: var(--text); font-weight: 700; }
+header.top { flex-shrink: 0; position: relative; z-index: 20; border-bottom: 1px solid var(--line); background: var(--bar); padding-top: env(safe-area-inset-top, 0px); }
+.top-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px) minmax(0, 1fr); align-items: center; gap: 24px; height: 68px; padding: 0 28px; }
+.top-row .brand { white-space: nowrap; }
+.top-search { border-radius: 22px; padding: 0 18px; }
+.top-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.menu-wrap { position: relative; }
+.menu { position: absolute; top: calc(100% + 8px); right: 0; min-width: 240px; padding: 8px; background: var(--raised); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 14px 34px rgba(0,0,0,0.55); z-index: 25; }
+.menu button { width: 100%; height: 44px; display: flex; align-items: center; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font-weight: 600; text-align: left; cursor: pointer; }
+.menu button:hover, .menu button:focus-visible { background: var(--chip); color: var(--text); }
+.menu button.danger { color: var(--red); }
+.menu .sep { height: 1px; background: var(--line); margin: 6px 0; }
+.menu .who { padding: 8px 12px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.menu .who .k { font-size: 12px; color: var(--muted); }
+.menu .who .v { font-weight: 700; margin-top: 2px; overflow-wrap: anywhere; }
+.btn .chev-d { width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+.avatar { width: 44px; height: 44px; padding: 0; border-radius: 22px; border: 1px solid var(--line-strong); background: var(--amber-bg); color: var(--amber-text); font-weight: 800; font-size: 14px; cursor: pointer; }
+.avatar:hover, .avatar[aria-expanded="true"] { border-color: var(--amber); }
+nav.tabs { display: flex; justify-content: center; gap: 8px; height: 48px; border-top: 1px solid var(--line-soft); }
+nav.tabs button { height: 48px; padding: 0 22px; border-radius: 0; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #B6AEAC; font-weight: 600; cursor: pointer; }
+nav.tabs button:hover { color: var(--text); }
+nav.tabs button[aria-current="page"] { color: var(--text); font-weight: 700; border-bottom-color: var(--amber); }
 nav.tabs .count { font-family: var(--mono); font-size: 12px; color: var(--amber); margin-left: 6px; }
 .spacer { flex-grow: 1; }
 .view { flex-grow: 1; min-height: 0; }
@@ -71,7 +88,6 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
 .lifetime .num { font-family: var(--mono); font-size: 28px; font-weight: 600; }
 .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .controls .input { width: auto; }
-#search { flex: 1 1 220px; min-width: 180px; }
 .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
 .seg button { height: 42px; padding: 0 14px; border: 0; background: transparent; color: var(--text-2); cursor: pointer; font-weight: 600; font-size: 13px; }
 .seg button + button { border-left: 1px solid var(--line-strong); }
@@ -195,10 +211,13 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; font-stretch: 78%; letter-spa
 
 /* ---------- mobile ---------- */
 @media (max-width: 900px) {
-  header.top { gap: 12px; padding: 0 14px; height: auto; min-height: 60px; flex-wrap: wrap; padding-bottom: 8px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+  .top-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; height: auto; padding: 10px 14px 12px; }
+  .top-row .top-search-wrap { grid-column: 1 / -1; grid-row: 2; }
+  .top-actions { gap: 8px; }
   .brand-kicker { display: none; }
   .brand { font-size: 20px; }
-  nav.tabs { order: 3; width: 100%; overflow-x: auto; }
+  nav.tabs { overflow-x: auto; }
+  nav.tabs button { padding: 0 16px; }
   #view-catalog { grid-template-columns: 1fr; }
   #detail { position: fixed; inset: 0; z-index: 30; border-left: 0; padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 40px; transform: translateX(100%); transition: transform .22s ease; }
   #detail.open { transform: translateX(0); }
@@ -266,7 +285,7 @@ body.help-open { overflow: hidden; }
 <div id="auth">
   <div class="box">
     <div class="brand-kicker">MASTER BUS</div>
-    <div class="brand">BACK CATALOG</div>
+    <div class="brand">BACKCAT</div>
     <label class="field"><span>Email</span><input class="input" type="email" id="authEmail" autocomplete="username"></label>
     <label class="field"><span>Password</span><input class="input" type="password" id="authPassword" autocomplete="current-password"></label>
     <button class="btn primary" id="authBtn">Sign in</button>
@@ -278,20 +297,36 @@ body.help-open { overflow: hidden; }
 <!-- ======================= APP ======================= -->
 <div class="app hidden" id="app">
   <header class="top">
-    <div>
-      <div class="brand-kicker">MASTER BUS</div>
-      <div class="brand">BACK CATALOG</div>
+    <div class="top-row">
+      <div class="brand">BACKCAT</div>
+      <div class="top-search-wrap">
+        <input class="input top-search" id="search" type="search" placeholder="Search title, writer, tag, or work #" aria-label="Search songs">
+      </div>
+      <div class="top-actions">
+        <div class="menu-wrap">
+          <button class="btn primary" id="addBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu">Add <span class="chev-d" aria-hidden="true"></span></button>
+          <div class="menu hidden" id="addMenu" role="menu" aria-label="Add">
+            <button role="menuitem" id="newSongBtn">New song</button>
+            <button role="menuitem" id="menuImport">Import statement</button>
+            <button role="menuitem" id="menuVault">From Song Vault</button>
+          </div>
+        </div>
+        <div class="menu-wrap">
+          <button class="avatar" id="acctBtn" aria-label="Account menu" aria-haspopup="menu" aria-expanded="false" aria-controls="acctMenu">?</button>
+          <div class="menu hidden" id="acctMenu" role="menu" aria-label="Account">
+            <div class="who"><div class="k">Signed in as</div><div class="v" id="acctEmail"></div></div>
+            <button role="menuitem" id="menuStatements">View Statements</button>
+            <button role="menuitem" id="helpBtn" aria-haspopup="dialog">Help &amp; how-to guide</button>
+            <div class="sep"></div>
+            <button role="menuitem" class="danger" id="signOutBtn">Sign out</button>
+          </div>
+        </div>
+      </div>
     </div>
     <nav class="tabs" aria-label="Sections">
       <button data-view="catalog" aria-current="page">Catalog</button>
-      <button data-view="statements">Statements</button>
-      <button data-view="import">Import statement</button>
       <button data-view="vault">Song Vault<span class="count" id="vaultCount"></span></button>
     </nav>
-    <div class="spacer"></div>
-    <button class="btn" id="helpBtn" aria-haspopup="dialog">Help</button>
-    <button class="btn primary" id="newSongBtn">New song</button>
-    <button class="btn" id="signOutBtn">Sign out</button>
   </header>
 
   <!-- CATALOG -->
@@ -309,7 +344,6 @@ body.help-open { overflow: hidden; }
           </div>
         </div>
         <div class="controls">
-          <input class="input" id="search" type="search" placeholder="Search title, writer, tag, sounds-like, or work #" aria-label="Search songs">
           <div class="seg" role="group" aria-label="Tagging">
             <button data-tagf="all" aria-pressed="true">All</button>
             <button data-tagf="tagged" aria-pressed="false">Tagged</button>
@@ -388,13 +422,13 @@ body.help-open { overflow: hidden; }
 <!-- ======================= HELP ======================= -->
 <div id="help" class="hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
   <div class="help-bar">
-    <div class="brand">BACK CATALOG · HELP</div>
+    <div class="brand">BACKCAT · HELP</div>
     <div class="spacer"></div>
     <button class="btn primary" id="helpClose">Back to catalog</button>
   </div>
   <div class="help-body" id="helpBody" tabindex="-1">
-    <h1 id="helpTitle">How Back Catalog works</h1>
-    <p>Back Catalog is your master song catalog. It keeps every song in one place with its writers, publishers and shares, tags each song so you can see which artists it suits, and adds up the royalty income each song has earned. This page walks you through it from the start.</p>
+    <h1 id="helpTitle">How BackCat works</h1>
+    <p>BackCat is your master song catalog. It keeps every song in one place with its writers, publishers and shares, tags each song so you can see which artists it suits, and adds up the royalty income each song has earned. This page walks you through it from the start.</p>
     <div class="toc" aria-label="Help sections">
       <a href="#h-start">Getting started</a>
       <a href="#h-around">Finding your way around</a>
@@ -403,7 +437,7 @@ body.help-open { overflow: hidden; }
       <a href="#h-song">The song panel</a>
       <a href="#h-tags">Tags and best fits</a>
       <a href="#h-statements">Importing statements</a>
-      <a href="#h-list">The Statements tab</a>
+      <a href="#h-list">View Statements</a>
       <a href="#h-vault">Song Vault</a>
       <a href="#h-tips">Tips and questions</a>
     </div>
@@ -413,21 +447,22 @@ body.help-open { overflow: hidden; }
       <li>Open the app and sign in with your email and password. It is the same account you use for Song Vault and Pitch Log.</li>
       <li>You land on the <b>Catalog</b> tab, which lists all your songs.</li>
       <li>Click any song to open its details on the right (on a phone, the details slide in over the list).</li>
-      <li>Click <b>Help</b> at the top any time to come back to this page, and <b>Back to catalog</b> when you are done.</li>
+      <li>Open the round account button at the top right and choose <b>Help &amp; how-to guide</b> any time to come back to this page. Click <b>Back to catalog</b> when you are done.</li>
     </ol>
 
     <h2 id="h-around">Finding your way around</h2>
-    <p>The bar across the top has four tabs, plus the Help, New song and Sign out buttons.</p>
+    <p>The bar across the top has the search box in the middle, an <b>Add</b> menu and your <b>account</b> button on the right, and two tabs underneath.</p>
     <div class="shot">
-      <div class="tabs-mock"><span class="on">Catalog</span><span>Statements</span><span>Import statement</span><span>Song Vault <b style="color:var(--amber);font-family:var(--mono)">2</b></span></div>
+      <div class="tabs-mock"><span class="on">Catalog</span><span>Song Vault <b style="color:var(--amber);font-family:var(--mono)">2</b></span></div>
       <div class="cap">The top tabs. The number next to Song Vault is how many new songs are waiting there.</div>
     </div>
     <ul>
       <li><b>Catalog</b>: your songs. Search, filter, open and edit them.</li>
-      <li><b>Statements</b>: the list of royalty statements you have imported.</li>
-      <li><b>Import statement</b>: bring in a new royalty statement so each song's income updates.</li>
-      <li><b>Song Vault</b>: new co-writes from Song Vault that are not in your catalog yet.</li>
-      <li><b>New song</b>: add a song by hand.</li>
+      <li><b>Catalog</b> tab: your songs. Search, filter, open and edit them.</li>
+      <li><b>Song Vault</b> tab: new co-writes from Song Vault that are not in your catalog yet.</li>
+      <li><b>Search box</b>: type a title, writer, tag or work number from any screen to find songs.</li>
+      <li><b>Add</b> menu: <b>New song</b> (add one by hand), <b>Import statement</b> (bring in a royalty statement so each song's income updates), and <b>From Song Vault</b>.</li>
+      <li><b>Account button</b> (your initial): <b>View Statements</b> (the list of statements you have imported), <b>Help &amp; how-to guide</b>, and <b>Sign out</b>.</li>
     </ul>
 
     <h2 id="h-catalog">The Catalog</h2>
@@ -447,7 +482,7 @@ body.help-open { overflow: hidden; }
       <li><b>Filter by tags</b>: opens a panel of tag buttons (see below).</li>
     </ul>
     <h3>Filtering by tags</h3>
-    <p>Click <b>Filter by tags</b>, then click the tags you want. Picking several tags in the same group means "any of these". Picking tags from different groups means "all of these". For example, <b>Female</b> vocal plus <b>Ballad</b> or <b>Slow</b> tempo shows songs that are female-vocal and either ballad or slow. Your choices show as small buttons under the search bar; click one to remove it, or click <b>Clear</b>.</p>
+    <p>Click <b>Filter by tags</b>, then click the tags you want. Picking several tags in the same group means "any of these". Picking tags from different groups means "all of these". For example, <b>Female</b> vocal plus <b>Ballad</b> or <b>Slow</b> tempo shows songs that are female-vocal and either ballad or slow. Your choices show as small buttons above the song list; click one to remove it, or click <b>Clear</b>.</p>
     <div class="shot">
       <div class="chips"><span class="chip" aria-hidden="true">Male</span><span class="chip" aria-hidden="true" style="background:var(--amber);border-color:var(--amber);color:var(--ground)">Female</span><span class="chip" aria-hidden="true">Duet</span></div>
       <div class="chips"><span class="chip" aria-hidden="true" style="background:var(--amber);border-color:var(--amber);color:var(--ground)">Ballad</span><span class="chip" aria-hidden="true" style="background:var(--amber);border-color:var(--amber);color:var(--ground)">Slow</span><span class="chip" aria-hidden="true">Up-tempo</span></div>
@@ -456,12 +491,12 @@ body.help-open { overflow: hidden; }
 
     <h2 id="h-add">Adding a song</h2>
     <ol>
-      <li>Click <b>New song</b> at the top.</li>
+      <li>Click <b>Add</b> at the top right, then <b>New song</b>.</li>
       <li>Type the title, then fill in whatever you know. Only the title is needed to start.</li>
       <li>Add writers and publishers with their shares (see "The song panel").</li>
       <li>Click <b>Add to catalog</b> at the bottom of the panel.</li>
     </ol>
-    <p>Songs that come from co-writers in Song Vault are added from the <b>Song Vault</b> tab instead, which copies their writers, publishers and splits for you.</p>
+    <p>Songs that come from co-writers in Song Vault are added from the <b>Song Vault</b> tab (or <b>Add</b> › <b>From Song Vault</b>) instead, which copies their writers, publishers and splits for you.</p>
 
     <h2 id="h-song">The song panel</h2>
     <p>Clicking a song opens a panel with everything about it. Change anything you like, then click <b>Save changes</b> at the bottom. A status next to the button tells you whether you have unsaved changes. Close the panel with the <b>×</b> button or the Esc key; if you have unsaved edits, you will be asked first.</p>
@@ -503,7 +538,7 @@ body.help-open { overflow: hidden; }
     <h2 id="h-statements">Importing royalty statements</h2>
     <p>Importing a statement adds up what each song earned so the income numbers stay current. You can import a <b>SESAC statement (CSV file)</b> or a <b>Me Gusta Music statement (PDF file)</b>.</p>
     <ol>
-      <li>Open the <b>Import statement</b> tab.</li>
+      <li>Click <b>Add</b> at the top right, then <b>Import statement</b>.</li>
       <li>Click the box to choose your file, or drag the file onto it.</li>
       <li>Read the preview. It shows the total, how many songs matched your catalog, and how many did not.</li>
       <li>Tick <b>Add the unmatched songs to the catalog</b> if you want songs that are not in your catalog yet created for you.</li>
@@ -518,8 +553,8 @@ body.help-open { overflow: hidden; }
     </ul>
     <p>Income is recorded exactly as the statement shows it. Any admin fee Me Gusta takes is not adjusted for.</p>
 
-    <h2 id="h-list">The Statements tab</h2>
-    <p>This is the history of everything you have imported. Filter by <b>Quarterly</b> or <b>Monthly</b>, or by source. Each row has <b>Rename</b> (to change how the period is labelled) and <b>Delete</b> (which removes that statement's income from your songs, so use it with care).</p>
+    <h2 id="h-list">View Statements</h2>
+    <p>Open the account button and choose <b>View Statements</b>. This is the history of everything you have imported. Filter by <b>Quarterly</b> or <b>Monthly</b>, or by source. Each row has <b>Rename</b> (to change how the period is labelled) and <b>Delete</b> (which removes that statement's income from your songs, so use it with care).</p>
 
     <h2 id="h-vault">Song Vault</h2>
     <p>Song Vault is where new co-writes from other writers arrive. This tab shows the ones that are not in your catalog yet.</p>
@@ -536,11 +571,11 @@ body.help-open { overflow: hidden; }
     <h3>A song is missing from the list.</h3>
     <p>Check whether a search, status, tag filter or "Tagged/Untagged" choice is hiding it. The line under the Catalog title says how many songs are showing out of the total.</p>
     <h3>The income looks too low or too high.</h3>
-    <p>Open the song and look at its statements list under Total income. If a statement was imported twice or is missing, fix it in the Statements tab.</p>
+    <p>Open the song and look at its statements list under Total income. If a statement was imported twice or is missing, fix it in <b>View Statements</b> (account button).</p>
     <h3>Can I use it on my phone?</h3>
     <p>Yes. On a small screen the song panel opens over the list; use the <b>×</b> to go back.</p>
     <h3>How do I sign out?</h3>
-    <p>Click <b>Sign out</b> at the top right.</p>
+    <p>Open the account button at the top right and choose <b>Sign out</b>.</p>
 
     <div class="help-foot">For further assistance, please contact <a href="mailto:MasterBusMDM@gmail.com">MasterBusMDM@gmail.com</a>.</div>
   </div>
@@ -623,6 +658,7 @@ let started = false;
 async function start(session) {
   if (started || !session) return; started = true;
   user = session.user;
+  { const em = user?.email || ''; $('#acctEmail').textContent = em || 'your account'; $('#acctBtn').textContent = (em[0] || 'A').toUpperCase(); }
   $('#auth').classList.add('hidden'); $('#app').classList.remove('hidden');
   try { await loadAll(); } catch (e) { showLoadError(e); return; }
   renderCatalog();
@@ -1621,8 +1657,8 @@ window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); 
 /* Help */
 (function () {
   const help = document.getElementById('help'), btn = document.getElementById('helpBtn');
-  let opener = null;
-  function openHelp() { opener = btn; help.classList.remove('hidden'); document.body.classList.add('help-open'); help.scrollTop = 0; document.getElementById('helpBody').focus({ preventScroll: true }); }
+  let opener = null; const acct = document.getElementById('acctBtn');
+  function openHelp() { opener = acct; help.classList.remove('hidden'); document.body.classList.add('help-open'); help.scrollTop = 0; document.getElementById('helpBody').focus({ preventScroll: true }); }
   function closeHelp() { help.classList.add('hidden'); document.body.classList.remove('help-open'); if (opener) opener.focus(); }
   btn.addEventListener('click', openHelp);
   document.getElementById('helpClose').addEventListener('click', closeHelp);
@@ -1635,6 +1671,33 @@ window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); 
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !help.classList.contains('hidden')) { e.stopImmediatePropagation(); closeHelp(); }
   }, true);
+})();
+
+/* Top-bar menus */
+(function () {
+  const pairs = [['addBtn', 'addMenu'], ['acctBtn', 'acctMenu']];
+  function closeAll(except) {
+    pairs.forEach(([b, m]) => { if (m === except) return; $('#' + m).classList.add('hidden'); $('#' + b).setAttribute('aria-expanded', 'false'); });
+  }
+  pairs.forEach(([b, m]) => $('#' + b).addEventListener('click', () => {
+    const menu = $('#' + m), open = menu.classList.contains('hidden');
+    closeAll(open ? m : null);
+    menu.classList.toggle('hidden', !open);
+    $('#' + b).setAttribute('aria-expanded', String(open));
+    if (open) menu.querySelector('button')?.focus();
+  }));
+  $$('.menu button').forEach(i => i.addEventListener('click', () => closeAll()));
+  document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) closeAll(); });
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const open = $('.menu:not(.hidden)'); if (!open) return;
+    const btn = open.id === 'addMenu' ? 'addBtn' : 'acctBtn';
+    closeAll(); e.stopImmediatePropagation(); $('#' + btn).focus();
+  }, true);
+  $('#menuImport').addEventListener('click', () => showView('import'));
+  $('#menuVault').addEventListener('click', () => showView('vault'));
+  $('#menuStatements').addEventListener('click', () => showView('statements'));
+  $('#search').addEventListener('input', () => { if ($('#view-catalog').classList.contains('hidden')) showView('catalog'); });
 })();
 </script>
 </body>
